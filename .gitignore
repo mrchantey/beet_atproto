@@ -1,0 +1,8 @@
+target
+.agents/*
+!.agents/skills
+.env
+dump.*
+out.txt
+rustc-ice*
+.rustc_info.json

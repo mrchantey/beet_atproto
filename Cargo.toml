@@ -1,0 +1,85 @@
+[workspace]
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+beet_atproto_shared = { path = "crates/shared", version = "0.1.0" }
+beet_atproto_client = { path = "crates/client", version = "0.1.0" }
+beet_atproto_feed = { path = "crates/feed", version = "0.1.0" }
+# The local beet checkout, like beet_esp. Crates depend on the `beet` facade
+# rather than the individual beet crates so `#[action]`/`#[template]` macro
+# expansions (which emit `beet::` paths downstream) resolve; each crate turns
+# on only the facade features it needs.
+beet = { path = "/home/pete/me/beet", default-features = false }
+
+serde = { version = "1", default-features = false, features = ["derive"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+# profiles mirror beet's: fast test builds, lightly optimized dev, optimized deps
+[profile.test]
+opt-level = 0
+
+[profile.dev]
+opt-level = 1
+split-debuginfo = "unpacked"
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[package]
+name = "beet_atproto"
+version.workspace = true
+edition.workspace = true
+description = "An AT Protocol (Bluesky) toolkit for the beet engine"
+
+[features]
+default = ["client", "feed"]
+client = ["dep:beet_atproto_client"]
+feed = ["dep:beet_atproto_feed"]
+# transports forwarded to the beet stack: the jetstream `wss://` socket and the
+# xrpc `https://` clients
+tungstenite = ["beet_atproto_feed?/tungstenite"]
+native-tls = ["beet_atproto_client?/native-tls", "beet_atproto_feed?/native-tls"]
+rustls-tls = ["beet_atproto_client?/rustls-tls", "beet_atproto_feed?/rustls-tls"]
+ureq = ["beet_atproto_client?/ureq", "beet_atproto_feed?/ureq"]
+
+[dependencies]
+beet_atproto_shared = { workspace = true }
+beet_atproto_client = { workspace = true, optional = true }
+beet_atproto_feed = { workspace = true, optional = true }
+
+[dev-dependencies]
+# everything the examples need, so `cargo run --example ..` needs no flags
+beet = { workspace = true, features = [
+	"std",
+	"json",
+	"sockets",
+	"router",
+	"http_server",
+	"tui_server",
+	"thread",
+	"tungstenite",
+	"ureq",
+	"native-tls",
+] }
+beet_atproto = { path = ".", features = ["tungstenite", "ureq", "native-tls"] }
+
+# 💡 Examples
+
+# The whats-alf feed generator: live Jetstream ingest served as a skeleton on
+# 8337, with `publish` wired as a route.
+[[example]]
+name = "feed_generator"
+path = "examples/feed_generator.rs"
+required-features = ["feed"]
+
+# The reading half: polls a generator (or a published feed), hydrates through
+# the AppView, and renders one thread on http/tui/cli surfaces.
+[[example]]
+name = "client"
+path = "examples/client.rs"
+required-features = ["client"]

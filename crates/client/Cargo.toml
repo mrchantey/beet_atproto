@@ -1,0 +1,35 @@
+[package]
+name = "beet_atproto_client"
+version.workspace = true
+edition.workspace = true
+description = "An AT Protocol client for bevy applications: AppView reads and feed following"
+
+[features]
+default = []
+# TLS backends for the `https://` AppView reads, forwarded to beet's http
+# client.
+native-tls = ["beet/native-tls"]
+rustls-tls = ["beet/rustls-tls"]
+# The blocking-wrapped http client backing native reads.
+ureq = ["beet/ureq"]
+
+[dependencies]
+beet_atproto_shared = { workspace = true }
+beet = { workspace = true, features = ["std", "json", "net"] }
+serde = { workspace = true }
+
+[dev-dependencies]
+beet = { workspace = true, features = ["testing"] }
+serde_json = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+# live-network tests read the public AppView over `https://`
+beet_atproto_client = { path = ".", features = ["ureq", "native-tls"] }
+
+[lib]
+harness = false
+
+[[test]]
+name = "live"
+path = "tests/live.rs"
+harness = false

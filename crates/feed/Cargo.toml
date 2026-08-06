@@ -1,0 +1,44 @@
+[package]
+name = "beet_atproto_feed"
+version.workspace = true
+edition.workspace = true
+description = "An AT Protocol feed generator toolkit for bevy applications"
+
+[features]
+default = []
+# The native websocket transport for the live Jetstream subscription; wasm uses
+# web-sys sockets without it. Pair with a tls feature for `wss://` endpoints.
+tungstenite = ["beet/tungstenite"]
+# TLS backends for the `wss://` Jetstream subscription and the `https://`
+# publish flow, forwarded to beet's socket + http clients.
+native-tls = ["beet/native-tls"]
+rustls-tls = ["beet/rustls-tls"]
+# The blocking-wrapped http client backing `PublishFeed` on native.
+ureq = ["beet/ureq"]
+
+[dependencies]
+beet_atproto_shared = { workspace = true }
+beet = { workspace = true, features = ["std", "json", "sockets", "router"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# force getrandom's `wasm_js` (WebCrypto) backend into the graph: fastrand/ahash
+# pull getrandom 0.3, which has no default wasm backend (pairs with the
+# `getrandom_backend` rustflags in .cargo/config.toml)
+getrandom = { workspace = true }
+
+[dev-dependencies]
+beet = { workspace = true, features = ["testing"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+# live-network tests dial the public Jetstream instances over `wss://`
+beet_atproto_feed = { path = ".", features = ["tungstenite", "ureq", "native-tls"] }
+
+[lib]
+harness = false
+
+[[test]]
+name = "live"
+path = "tests/live.rs"
+harness = false

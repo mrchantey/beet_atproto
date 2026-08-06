@@ -1,0 +1,15 @@
+[package]
+name = "beet_atproto_shared"
+version.workspace = true
+edition.workspace = true
+description = "AT Protocol wire types shared by the beet_atproto crates"
+
+[dependencies]
+beet = { workspace = true, features = ["std", "json"] }
+serde = { workspace = true }
+
+[dev-dependencies]
+beet = { workspace = true, features = ["testing"] }
+
+[lib]
+harness = false
