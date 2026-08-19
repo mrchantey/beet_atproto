@@ -74,8 +74,6 @@
 //! generator, post bodies from the public AppView.
 use beet::prelude::*;
 use beet_atproto::prelude::*;
-// `Table::id()` on the `Thread`, shadowed in the facade prelude
-use beet::thread::table::Table;
 
 /// The feed served by `examples/feed_generator.rs` with its default publisher.
 const DEFAULT_FEED: &str = "at://did:example:alice/app.bsky.feed.generator/whats-alf";
@@ -156,7 +154,7 @@ fn setup(mut commands: Commands) -> Result {
 			..default()
 		}
 		.any_bundle(),
-		"tui" => TuiServer.any_bundle(),
+		"tui" => TuiServer::default().any_bundle(),
 		"cli" => CliServer::default().any_bundle(),
 		_ => bevybail!("accepted --server values: http, tui, cli"),
 	};
