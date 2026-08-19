@@ -13,7 +13,7 @@ beet_atproto_feed = { path = "crates/feed", version = "0.1.0" }
 # rather than the individual beet crates so `#[action]`/`#[template]` macro
 # expansions (which emit `beet::` paths downstream) resolve; each crate turns
 # on only the facade features it needs.
-beet = { path = "/home/pete/me/beet", default-features = false }
+beet = { path = "../beet", default-features = false }
 
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
