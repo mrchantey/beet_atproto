@@ -39,7 +39,7 @@ async fn end_to_end_live() {
 	app.add_plugins((MinimalPlugins, AsyncPlugin, RouterPlugin));
 	let root = app
 		.world_mut()
-		.spawn((default_router(), children![(
+		.spawn((Router::with_defaults(), children![(
 			feed_generator(FeedGenerator::new(
 				"feed.example.com",
 				"did:example:alice",

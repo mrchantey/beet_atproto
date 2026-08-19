@@ -16,7 +16,7 @@ use beet_atproto::prelude::*;
 
 commands
 	.spawn((HttpServer::default(), children![(
-		default_router(),
+		Router::with_defaults(),
 		children![(
 			feed_generator(FeedGenerator::new("feed.example.com", "did:plc:me")),
 			children![(
@@ -35,8 +35,7 @@ commands.spawn(Jetstream::default());
 The two examples pair up: `feed_generator` serves a whats-alf feed on 8337, and `client` reads it (or Bluesky's published whats-hot when no generator is up), rendering one thread on a web page, a live terminal ui and a one-shot cli render.
 
 ```sh
-# alf posts are sparse; a common letter fills the feed within seconds
-cargo run --example feed_generator -- --filter=e
+cargo run --example feed_generator
 cargo run --example client
 ```
 

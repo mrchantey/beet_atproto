@@ -23,8 +23,8 @@
 //! # serve on http://localhost:8337, ingesting live alf posts
 //! cargo run --example feed_generator
 //!
-//! # alf posts are sparse; a common letter fills the feed within seconds
-//! cargo run --example feed_generator -- --filter=e
+//! # any other substring, eg a whats-bevy feed
+//! cargo run --example feed_generator -- --filter=bevy
 //! ```
 //!
 //! Wait for `jetstream connected`, then probe it from another terminal:
@@ -37,9 +37,10 @@
 //!
 //! In order: the crate version, the `did:web` document naming this service, the
 //! one feed it declares, and the feed itself as a *skeleton*, `limit` post uris
-//! and a cursor. An empty `feed` array means no matching post has crossed the
-//! firehose yet, so use a commoner `--filter`. The uris are the client's input,
-//! and resolve in a browser via [bsky.app]'s post viewer.
+//! and a cursor. `--filter` is a case insensitive *substring* match, so the
+//! default `alf` fills within seconds off *half* and *Ralf*; a rarer one leaves
+//! `feed` empty until a matching post crosses the firehose. The uris are the
+//! client's input, and resolve in a browser via [bsky.app]'s post viewer.
 //!
 //! Errors follow the xrpc spec, so a feed uri this generator does not serve is
 //! an `UnsupportedAlgorithm` 400 rather than an empty feed.
@@ -108,7 +109,7 @@ fn setup(mut commands: Commands) -> Result {
 	};
 	commands
 		.spawn((server_bundle, children![(
-			default_router(),
+			Router::with_defaults(),
 			children![(
 				feed_generator(FeedGenerator::new(&hostname, &publisher)),
 				children![
@@ -117,7 +118,7 @@ fn setup(mut commands: Commands) -> Result {
 						ChronologicalFeed,
 						PostFilter::text_contains(&filter),
 					),
-					exchange_route("publish", Publish),
+					route::exchange("publish", Publish),
 				],
 			)],
 		)]))

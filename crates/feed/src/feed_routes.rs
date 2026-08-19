@@ -48,7 +48,7 @@ impl FeedGenerator {
 /// # use beet::prelude::*;
 /// # use beet_atproto_feed::prelude::*;
 /// let mut world = (AsyncPlugin, RouterPlugin).into_world();
-/// world.spawn((default_router(), children![(
+/// world.spawn((Router::with_defaults(), children![(
 /// 	feed_generator(FeedGenerator::new("feed.example.com", "did:plc:me")),
 /// 	children![(
 /// 		FeedDef::new("whats-alf"),
@@ -253,7 +253,7 @@ mod test {
 		"at://did:plc:publisher/app.bsky.feed.generator/whats-alf";
 
 	fn test_tree() -> impl Bundle {
-		(default_router(), children![(
+		(Router::with_defaults(), children![(
 			feed_generator(FeedGenerator::new(
 				"feed.example.com",
 				"did:plc:publisher",
@@ -428,7 +428,7 @@ mod test {
 	async fn hides_did_document_on_foreign_service_did() {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
-			.spawn((default_router(), children![feed_generator(
+			.spawn((Router::with_defaults(), children![feed_generator(
 				FeedGenerator::new("feed.example.com", "did:plc:publisher")
 					.with_service_did("did:web:other.com"),
 			)]))

@@ -43,7 +43,7 @@
 //! first and the client finds it on 8337:
 //!
 //! ```sh
-//! cargo run --example feed_generator -- --filter=e
+//! cargo run --example feed_generator
 //! ```
 //!
 //! The status line names whichever feed won, because the two are worth telling
@@ -162,7 +162,7 @@ fn setup(mut commands: Commands) -> Result {
 	};
 	commands
 		.spawn((server_bundle, children![(
-			default_router(),
+			Router::with_defaults(),
 			children![routes()]
 		)]))
 		.trigger(StartRunning::from_cli);
@@ -606,7 +606,7 @@ fn author_line() -> OnSpawn {
 
 /// The account and engagement line, quieter than the body.
 fn meta_line() -> OnSpawn {
-	inline_class![token(
+	inline_class![Declaration::token(
 		common_props::ForegroundColor,
 		material::colors::OnSurfaceVariant
 	)]

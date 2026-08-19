@@ -42,7 +42,7 @@ fn setup(mut commands: Commands) {
 	// the server owns the boot, the router and the feed ride underneath it
 	commands
 		.spawn((HttpServer::default(), children![(
-			default_router(),
+			Router::with_defaults(),
 			children![(
 				feed_generator(FeedGenerator::new(
 					"example.com",
@@ -104,13 +104,20 @@ curl -s 'localhost:8337/xrpc/app.bsky.feed.getFeedSkeleton?feed=at://did:example
 
 Real accounts, real posts, seconds old. Note what is *not* in that response: no text, no authors, no counts. A skeleton is uris and a cursor, and that is the entire contract.
 
-Posts mentioning alf are rare, so the feed may sit empty for a while. To watch it fill immediately, change the filter to a common letter and restart:
+Pass that cursor back as `&cursor=...` and you get the next page, with no overlap. Ask for a feed that does not exist and you get the protocol's error shape, `{"error":"UnsupportedAlgorithm",...}` with a 400, which is what the network expects when it probes you.
+
+The feed fills within seconds, which is generous of it: `text_contains` is a plain case insensitive substring match, so `alf` also catches *half*, *Ralf* and *alfabeto*. Your algorithm is being literal, and tightening it is one edit, swapping the filter for any closure over the event and the record:
 
 ```rust
-					PostFilter::text_contains("e"),
+PostFilter::new(|_, post| {
+	post.text
+		.to_lowercase()
+		.split_whitespace()
+		.any(|word| word == "alf")
+}),
 ```
 
-Pass that cursor back as `&cursor=...` and you get the next page, with no overlap. Ask for a feed that does not exist and you get the protocol's error shape, `{"error":"UnsupportedAlgorithm",...}` with a 400, which is what the network expects when it probes you.
+Restart with that and the feed goes quiet for a long while, which is the honest whats-alf. Keep the substring filter for now, so the next step has posts to show.
 
 ## Read it with your client
 

@@ -17,7 +17,7 @@ Downstream deltas from the inherited conventions:
 - `just test`: the three crates' native suites
 - `just test-live`: live network tests against public Bluesky infrastructure
 - `just build-wasm`: wasm builds of the lib crates
-- `cargo run --example feed_generator -- --filter=e`: serve a whats-alf feed on 8337
+- `cargo run --example feed_generator`: serve a whats-alf feed on 8337
 - `cargo run --example client`: read it (or Bluesky's published whats-hot fallback) on 8338
 
 The examples double as the tutorial walkthroughs in `examples/*.md`, starting at `examples/README.md`.

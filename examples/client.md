@@ -44,7 +44,7 @@ async fn main() {
 }
 ```
 
-`AppView::default()` points at `https://public.api.bsky.app`, the public unauthenticated index. `DISCOVER_FEED_URI` is Bluesky's own Discover feed, a stable published feed handy for demos. We ask for ten posts and print them oldest first, so the newest ends up nearest your prompt.
+`AppView::default()` points at `https://public.api.bsky.app`, the public unauthenticated index. `DISCOVER_FEED_URI` is Bluesky's own Discover feed (its rkey is `whats-hot`), a stable published feed handy for demos. We ask for ten posts and print them oldest first, so the newest ends up nearest your prompt.
 
 `cross_log!` rather than `println!` because beet is cross-platform, and `println!` is silent in wasm.
 
@@ -119,7 +119,7 @@ async fn main() {
 cargo run
 ```
 
-Same shape of output, but every post is one your own filter chose. `into_result()` is what turns an HTTP error status into a Rust error, so a generator that is not running fails loudly instead of failing to parse.
+Same shape of output, but every post is one your own filter chose. A generator that is not running fails right there at `send()`, with `ConnectionRefused`. `into_result()` covers the other half: it turns an error *status* from a generator that is running into a Rust error, so an `{"error":"UnsupportedAlgorithm"}` body fails loudly instead of deep inside the json parse.
 
 Two details worth keeping when you build on this. `get_posts` batches for you, at the 25 uris per call the lexicon allows, and it returns posts in the order you asked for them. It also silently drops posts that have since been deleted, so a hydrated page can be shorter than the skeleton that produced it. That is correct behavior, not an error to handle.
 

@@ -93,7 +93,7 @@ impl Jetstream {
 /// the live component, so a reconnect resumes from the advanced cursor.
 async fn connection_loop(entity: AsyncEntity) -> Result {
 	// the reader task signals every connection end into this channel
-	let (closed_send, closed_recv) = writer_channel::unbounded::<()>();
+	let (closed_send, closed_recv) = writer_channel::Sender::<()>::unbounded();
 	entity.insert(SocketClosedNotify(closed_send)).await?;
 	loop {
 		// component gone (or entity despawned) ends the loop
