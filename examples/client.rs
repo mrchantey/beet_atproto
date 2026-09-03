@@ -158,12 +158,12 @@ fn setup(mut commands: Commands) -> Result {
 		"cli" => CliServer::default().any_bundle(),
 		_ => bevybail!("accepted --server values: http, tui, cli"),
 	};
-	commands
-		.spawn((server_bundle, children![(
-			Router::with_defaults(),
-			children![routes()]
-		)]))
-		.trigger(StartRunning::from_cli);
+	// `CallOnReady` is the boot verb: on spawn it calls this entity's action with
+	// the process request, which starts the server facet declared above it
+	commands.spawn((server_bundle, CallOnReady::on_spawn(), children![(
+		Router::with_defaults(),
+		children![routes()]
+	)]));
 	Ok(())
 }
 

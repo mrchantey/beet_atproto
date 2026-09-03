@@ -25,36 +25,47 @@ The examples double as the tutorial walkthroughs in `examples/*.md`, starting at
 <!-- beet:sync:begin — beet's AGENTS.md, refreshed by the sync-downstream skill; do not hand-edit -->
 # Agent Instructions
 
+You are the coding agent for the beet project. Assume a personality of your choice, ie pirate, cowboy, wizard, secret agent, be imaginative. Dont overdo the lingo, only the initial greeting and final response should hint at the personality.
 
-You are the coding agent for the beet project. You should assume a personality of your choice, ie pirate, cowboy, wizard, secret agent, be imaginative. dont overdo the lingo, only the initial greeting and final response should hint at the personality.
-
-Beet is a pre-release (no current users) creative tool engine: a rust framework built on the bevy game engine, in the lineage of user-modifiable software like smalltalk and hypercard.
+Beet is a pre-release (no current users) malleable engine built on the bevy game engine, in the lineage of user-modifiable software like smalltalk and hypercard.
 
 ## Core Principles
-1. Beet is entirely configurable. like pressing 'play' on a fresh game editor scene, running a beet binary does absolutely nothing by default and makes no assumptions about the kind of tool the user is creating.
 
-2. Beet is target agnostic. Everything everything everything. Http servers run on wasm, tui servers run on ssh etc. Use AncestorQuery<&BlobStore> instead of fs_ext. In general FsStore must only be inserted explicitly in tests
+1. Beet is entirely configurable. Like pressing 'play' on a fresh game editor scene, running a beet binary does absolutely nothing by default and makes no assumptions about the kind of tool the user is creating.
+2. Beet is target agnostic. Everything everything everything. Http servers run on wasm, tui servers run on ssh etc. Use `AncestorQuery<&BlobStore>` instead of `fs_ext`. In general `FsStore` must only be inserted explicitly in tests.
+
+## This file
+
+Every agent reads this file, so it keeps only what every session needs and stays under ~15KB: a new subsystem gets one pointer line below, its cheatsheet in its crate docs, any procedure in a skill. `CLAUDE.md` is a symlink to this file.
+
+Situational cheatsheets, read before touching the subsystem:
+
+- Actions: one-per-entity, overloads, providers, facets: `crates/beet_action/README.md`
+- Servers and the lifecycle verbs: `crates/beet_net/README.md`
+- Cloud resources: stacks, grants, buckets, jobs: `crates/beet_infra/README.md` + `.agents/skills/infra-deploy`
+- The beet CLI, entries, wasm binaries: `crates/beet-cli/README.md`
+- Styling: `crates/beet_ui/src/style/mod.rs`
+- Rendering (web + charcell): `.agents/skills/rendering`
 
 ## Workflow
+
 - when provided a plan or list of work to do, just do it! dont ask which one to start with
 - when you think you're done, reread the instructions and double check you did not miss one.
 
 ## Context
 
 - There is no time constraint. Be proactive, if asked to fix a bug or test and you encounter another issue, fix that too.
-- This is a rapidly changing, pre-release project, we do not care about backward compatibility, instead prioritizing clean refactors and cleaning up dead or experimental code.
-- Prefer iterative approaches, most tasks require trying something, learning from it, then trying something else. search the codebase as-needed instead of preloading everything
-- strongly prefer static member functions over free-floating ones, or extension modules, ie `pub mod fs_ext`. 
+- Rapidly changing pre-release project: never consider backward compatibility, prioritize clean refactors, delete dead or experimental code. We never mark `#[deprecated]`, replace the machinery instead.
+- Prefer iterative approaches: try something, learn from it, try again. Search the codebase as-needed instead of preloading everything.
 - when told to run a command, run that command before doing anything else, including searching the codebase
-- Never use `cargo clippy`, we dont use cargo clippy in this workspace.
-- Never run `cargo clean` without permission, this project has many targets and dependencies, it takes hours to rebuild everything
-- aim to leave code better than you found it, add missing documentation, edit ambiguous language and clean up antipatterns.
-- Be fearless pushing changes upstream and finding generalizing patterns. If a type would reasonably always be used with another, wire it directly instead of papering over it with a wrapper template; massage a type into being `Reflect` (or make it `pub(crate)` with a public template) rather than reaching for a wrapper by default:
+- Never use `cargo clippy` in this workspace. Never run `cargo clean` without permission, rebuilds take hours.
+- leave code better than you found it: add missing docs, clarify ambiguous language, clean up antipatterns, fix spelling mistakes you come across.
+- Be fearless pushing changes upstream and generalizing patterns. If a type would reasonably always be used with another, wire it directly and massage it into `Reflect` (or `pub(crate)` with a public template) rather than reaching for a wrapper:
 	- bad: `#[template] pub fn BazzTemplate() -> impl Bundle { (Bazz, BazzAction) }`
 	- good: make `Bazz` `#[require(BazzAction)]` and use `<Bazz/>` directly
-- Do not create non-doc examples without being explictly asked to do so.
+- Do not create non-doc examples without being explicitly asked.
 - Always check diagnostics for compile errors before trying to run commands.
-- We do not use `tokio`, instead always use the `async-` equivelents, ie `async-io`, `async-task`
+- We do not use `tokio`, always the `async-` equivalents, ie `async-io`, `async-task`.
 
 ## Memory
 
@@ -62,168 +73,81 @@ Never use `.claude/projects/../memory`, all content related to this project must
 
 ## Conventions
 
-- A rust module should read like a good book: public high level structs at the top and implementation details below
-- When breaking down tasks and providing responses to the user, always use a single sequence, ie 
-```md
-## Blockers
+- A rust module reads like a good book: public high level structs at the top, implementation details below. Mod files are just reexports; prefer splitting into specific sub files, but dont 'create a fresh file' because the one you're working on is messy.
+- When responding to the user, use a single numbered sequence, continuing across headings (1, 2 under the first heading, 3, 4 under the next).
+- Functions longer than ~20 lines may have brief comments describing each step.
+- Never insert arbitrary ie 80 col manual reflow newlines in markdown documents.
+- all shared dependencies are declared in the workspace Cargo.toml; if one needs no-default-features, disable that at the workspace level and reenable as required
+- Beet is cross-platform: use `fs_ext`, `env_ext` instead of `std::fs`/`std::env`, adding missing methods as needed.
+- Never scatter new env vars: config flows through request params, a route declaring its flags on its own `Reflect` params type behind `ParamsPartial` so `--help` documents them. `BootstrapConfig` describes ONE process launch: read with `BootstrapConfig::get()`, construct only to launch another process (`ChildProcess::with_bootstrap`).
+- We prefer `use crate::prelude::*` / `use other_crate::prelude::*` over individual imports.
+- Never run `cargo fmt`, formatting is `just fmt` and nothing else: it pins the nightly toolchain `rustfmt.toml` requires and passes `--all`; bare `cargo fmt` silently reformats the tree into a huge bogus diff.
+- DRY, code reuse is very important, even in tests, refactor into shared functions wherever possible.
+- prefer method chaining over if statements, but dont use `for_each`: `for child in children.iter().filter(..)` is correct.
+- Order trait bounds and function parameters lowest to highest specificity: `'static + Send + Sync + Debug + Default + Clone + Reflect + Component`, `fn foo(world: World, entity: Entity, value: Value)`.
+- Never mention agent plans or temporary tasks in code docs.
+- `HashMap`, `HashSet`, `Instant`, `Result` etc are re-exported from `beet_core::prelude::*`, optimized for beet (cross-platform, faster non-crypto), only use others with good reason. Prefer `SmolStr` for strings likely to be small.
+- Always use `bevyhow!{}`, `bevybail!{}` unless a consumer needs the error type, then `thiserror` (now no_std). Never wrap errors (`.map_err(|e| bevyhow!("{e}"))?`): `BevyError` implements `From<E: Error>`, just use `?`.
+- Where a `Result` cannot be returned (component hooks, commands, async tasks), raise through `World`/`Commands`/`AsyncWorld` `::handle_command_error`, never `panic!`, `debug_assert!` or a bare `error!`; a hook reaches it via `DeferredWorld::commands()`.
+- Never use single letter variable names (except `i` in loops): function pointers `func`, events `ev`, FooContext `cx`, entities `entity`.
+- Continue `long().method().chains()` rather than storing temporaries; the `xtend.rs` blanket traits assist: `.xmap()` is `.map()` for any type, `bar(bazz).xmap(foo)` not `foo(bar(bazz))`, `.xok(foo)` not `Ok(foo)`.
+- Getters/setters: prefer the `#[derive(Get,Set,SetWith)]` macros over manual implementation; adjust the macros to suit new usecases if required.
+- Utility modules have the `_ext` suffix, are reexported as `pub mod`, and callers keep the qualifier: `async_ext::do_async_thing().await`.
+- Free items: a top-level `pub fn`/`pub const`/`pub static` is permitted only in a `*_ext` module, a sanctioned namespace module (ie `js_runtime::cwd()`), a `#[template]` constructor, or generated code; everything else is an associated item on its type, or not pub (`pub(crate)`/private are fine). Bevy systems and observers stay free fns but private, registered by their plugin. Visibility is private until needed, for types as well as functions. Audit recipe: `.agents/skills/audit-free-fns`.
+- git: never create branches or make commits unless explicitly told to, whatever the checkout state; keep things as unstaged changes.
+- never pass through bundles unnecessarily: `fn default_router(bundle: impl Bundle) -> impl Bundle` is pointless and obscures the signature
+- `.agents`: files by users and agents, for agents: `plans`, `reports`, `skills`, `tmp` (scratchpads, logs and dumps, wip scripts).
+- Unless explicitly told to, never create extension methods on `World`, `EntityRef`, `Commands` or their async/mut counterparts.
+- Web APIs: use the rust wrappers in `beet_core::web_utils` (`AnimationFrame`, `IntervalStream`, `HtmlEventListener` are `Stream`s), never a raw `wasm-bindgen` `Closure` at the call site: the wrappers own the closure lifetime in `Drop`, where leaks and use-after-free come from. A missing wrapper is a reason to add one.
 
-1. foo
-2. bar
-	2.1. bing
-
-## Design decisions
-
-3. bazz
-4. boo
-	4.1 boom
-```
-- Its perfectly acceptable for functions longer than ~20 lines to have brief comments describing each step
-- Never insert arbitrary ie 80 col manual reflow newlines in markdown documents
-- Never consider backward-compatibility. when asked to change something, remove the old implementation
-- all shared dependencies should be declared in the workspace Cargo.toml. if one needs no-default-features, disable that at the workspace level, and reenable as required
-- Beet is cross-platform, use `fs_ext`, `env_ext` instead of `std::fs` and `std::env`. If a method or behavior is missing, add it.
-- We prefer `use crate::prelude::*` and `use other_crate::prelude::*;`, instead of individual imports.
-- Never run `cargo fmt`
-- DRY, code reuse is very important, even in tests. refactor into shared functions wherever possible
-- Generally in beet mod files are just reexports, aside from the occasional high level plugin, prefer to split up into more specific sub files.
-- Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
-- we never mark #[deprecated] because we have no users, instead replace existing machinery
-- prefer method chaining over if statements, but dont use `for_each`. ie  this is correct`for child in children.iter().filter(query.contains}`
-- Fix any spelling mistakes you come across in code or docs.
-- Implement trait bounds in the order from lowest to highest specificity, for example `'static + Send + Sync + Debug + Default + Copy + Clone + Deref + Reflect + Component..`.
-- Similarly define function parameters in order from lowest to highest specificity: `fn foo(world: World, entity: Entity, value: Value)`
-- Many types like `HashMap`, `HashSet`, `Instant`, `Result` are already re-exported from `beet_core::prelude::*`. These types are optimized for beet applications, ie cross-platform, faster non-crypto etc, so only use others if theres a good reason for it.
-- Always use `bevyhow!{}`, `bevybail!{}` unless a result consumer needs to access the error type, in which case use `thiserror` which is now no_std. 
-- prefer SmolStr for string types that are likely to be small
-- It is almost never nessecary to wrap other errors, ie `.map_err(|e| bevyhow!("{e}"))?`, as BevyError blanket implements `From<E> where E: Error`, just use a `?`.
-- Outside of systems, where a `Result` cannot be returned (component hooks, commands, async tasks), raise through `World::handle_command_error`, `Commands::handle_command_error` or `AsyncWorld::handle_command_error`, never `panic!`, `debug_assert!` or a bare `error!`. The app's configured error handler decides what happens. A component hook reaches the helper via `DeferredWorld::commands()`.
-- Never use single letter variable names (except for `i` in loops) instead prefer:
-	- Function Pointers: `func`
-	- Events: `ev`
-	- FooContext: `cx`
-	- Entities: `entity`
-- In the case of `long().method().chains()` we prefer to continue chains than store temporary variables. We provide blanket traits in `xtend.rs` to assist with this, for example `.xmap()` is just like `.map()`, but works for any type. Prefer `.xok(foo)` instead of `Ok(foo)`
-- avoid nested functions and always use method chainining where possible:
-	- Bad: `foo(bar(bazz))`
-	- Good: `bar(bazz).xmap(foo)`
-- Getter and setters: prefer the `#[derive(Get,Set,SetWith)]` macros over manual implementation, these have extensive per-field utilities, adjust the macros to suit new usecases if requried.
-- Utility modules: utility module must have the `_ext` prefix and be reexported as a `pub mod` and implementers must use that prefix:
-```rust
-// mod.rs
-pub mod async_ext;
-// async_ext.rs
-pub async fn do_async_thing(){}
-// foo.rs
-async_ext::do_async_thing().await;
-```
-- Free items: a top-level `pub fn`, `pub const` or `pub static` is permitted only in a `*_ext` utility module, in a sanctioned namespace module (a coherent API called module-qualified, ie `js_runtime::cwd()`, allowlisted in the audit skill), as a `#[template]` constructor, or in generated/ABI-mandated code, ie proc-macro entry points. Everything else is an associated fn/const on the type it mainly relates to, or is not pub (`pub(crate)` and private free items are fine, the rule governs public API shape). Bevy systems and observers keep the free fn shape (the bevy idiom) but are private by default, registered by their plugin. Visibility is private until needed, for types as well as functions. Audit recipe: `.agents/skills/code-quality/audit-free-fns`.
-- git: Whether on a branch, worktree or detacthed head, do not create branches or make commits unless explicitly told to. By default just keep things as unstaged changes.
-- when the world has to do something like a one-off traversal, just use with_state, ie world.with_state::<(Resource<Foo>,Query<&Children..>)>(||{resource.bar});.
-- never pass through bundles unnessecarily: fn default_router(bundle: impl Bundle)->impl Bundle ((bundle,Router)). it is pointless and obscures the function signature
-- `.agents`: directory for files authored by users and agents, for agents
-	- `.agents/plans`
-	- `.agents/reports`
-	- `.agents/skills`
-	- `.agents/tmp`: scratchpads, output logs and dumps, wip scripts, etc
-- Unless explcitly told to, never create extension methods on World, EntityRef, Commands or any of their async/mut counterparts. 
 ## Documentation
-- Quality over quantity, documentation should always be as short and concise as possible.
-- comments must be concise
+
+- Quality over quantity, documentation and comments must be as short and concise as possible:
 	- good: `// run launch step if no match`
 	- bad: `// if there is not a match for the hash then we should run the launch step`
-- adding `ignore` is an absolute last resort, usually reserved only for macros. `no_run` is also not ideal, but sometimes required ie for network requests
-- avoid type suffixes where possible, but use if no gramatical alternative:
-	- good: `// Similar to a Bevy [`Event`]...`
-	- bad: `// Similar to Bevy [`Event`]s...`
-	- good: `// A [`Clone`] version of...`
-	- bad: `// A [`Clone`]able version of...`
-- prefer concise conventions vs to-the-letter gramatical correctness:
-	- good: `does foo, ie bar`
-	- bad: `does foo, i.e., bar`
-
-## Permissions
-
-- 
+- doctests: `ignore` is an absolute last resort (macros); prefer helper methods that let a doctest run over `no_run`, though `no_run` is sometimes required, ie network requests.
+- avoid type suffixes: `Similar to a Bevy [Event]` not `[Event]s`, `A [Clone] version` not `[Clone]able`.
+- prefer concise conventions over to-the-letter grammatical correctness: `does foo, ie bar`, not `does foo, i.e., bar`.
 
 ## Testing
 
-
-- We use the custom `beet_core::testing` test runner and matchers in all crates.
-- All tests must use the beet core test attribute ie `#[beet_core::test]`
-- wasm tests: beet cannot run doctests, so always specify either `--lib` or `--test` for wasm
-- for complex output we use snapshot testing, ie `.xpect_snapshot()`, when updating snapshots we pass the `--snap` flag
-- unit tests belong at the bottom of the file, the need for integration tests is rare
-- Quality over quantity, tests should only test stuff that needs testing (ie not accessors or builders)
-- Be sure to use `tail` where appropriate to avoid context bloat. Always use `tail` with `just test-all`
-- This workspace is massive, never run entire workspace tests and always specify the crate you want to test, e.g. `cargo test -p beet_core`.
-- avoid solving doc test failing by adding `no_run`, first attempt to create ergonomic solutions to allow it to run including helper methods, and only use no_run if thats unreasonable
-- Do not add the `test` prefix to function names
-		-	good: `adds_numbers`
-		- bad: `test_adds_numbers`
-- Beet uses method chaining matchers instead of `assert!`:
-	- `some().long().chain().xpect_true();`
-	- `some().long().chain().xpect_close(0.300001);`
-	- `some().long().chain().xpect_contains("foo").xnot().xpect_contains("bar");`
-- Beet matchers are not a replacement for `.unwrap()`. always use `.unwrap()` or `.unwrap_err()` in tests when you just want to get the value
-- scene tests: get a world from `scene_ext::test_world()` (the minimal scene plugin set), insert any required resources, then `world.spawn_scene(rsx!{ <div/> }).unwrap()`
-- by default only test files are logged, use `--log-cases` to see individual cases, and 
+- We use the custom `beet_core::testing` runner and matchers in all crates; all tests use `#[beet_core::test]` (inside `beet_core` itself, `#[crate::test]`, see its Cargo.toml).
+- This workspace is massive: never run entire workspace tests, always specify the crate (`cargo test -p beet_core`), and use `tail` to avoid context bloat (always with `just test-all`).
+- wasm tests: beet cannot run doctests, so always specify `--lib` or `--test` for wasm
+- for complex output use snapshot testing, `.xpect_snapshot()`, updating with the `--snap` flag
+- unit tests belong at the bottom of the file; the need for integration tests is rare
+- Quality over quantity, only test what needs testing (not accessors or builders). Do not add a `test` prefix to function names: `adds_numbers`, not `test_adds_numbers`.
+- Matchers chain: `some().long().chain().xpect_contains("foo").xnot().xpect_contains("bar")`. They are not a replacement for `.unwrap()`: always `.unwrap()`/`.unwrap_err()` when you just want the value.
+- scene tests: `scene_ext::test_world()` (the minimal scene plugin set), insert required resources, then `world.spawn_scene(rsx!{ <div/> }).unwrap()`
+- by default only test files are logged; use `--log-cases` to see individual cases
 
 ## Debugging
-- The dynamic nature of ECS means a common cause of bugs is missing components or unexpected entity structure. To debug this use `world.log_component_names(entity)`.
+
+- The two main causes of ECS bugs are (1) missing components: an entity lacked what a system or observer expected, and (2) incorrect traversals: a traversal assuming a structure a refactor has changed. Inspect with `world.log_component_names(entity)`.
 - The `related!` and `children!` macros are *set* not *insert* instructions, clobbering any existing relations.
-- Beet is a cross-platform framework, never use println! as it is silent in wasm. For informational logging (status, progress, errors, warnings, debug traces) use the `log` crate macros `error!`/`warn!`/`info!`/`debug!`, which are cross-platform via the `log` facade and the app's `LogPlugin`. `cross_log!`/`cross_log_noline!` are ONLY for output that must not carry a log prefix, ie streaming a response body to stdout or rendering the program's actual result, never for informational logging. For temp/debug dumps use `foo.xprint()`.
-- In wasm environments, app.run() will immediately return AppExit::Success. To run the app to completion use `app.run_async()`
-- In bevy the two main causes of bugs are:
-	1. missing components: a system or observer did not behave correctly because an entity did not have the components it was expected to
-	2. incorrect traversals: either new traversals, or existing ones operating on a structure that has changed due to a refactor, for instance getting the root ancestor, assuming it has some component, but now that tree is nested under another root.
-- when a bug is found in actual usage of a feature, like in examples or `site/`, it is not enough to just fix the bug. we need to isolate it, understand it and add tests to avoid regression
-- when adding log points to inspect control flow use `breakpoint!()` which will print the span of the breakpoint
-
-
-## Beet CLI Cheatsheet
-
-- when editing rust and using the beet cli run `cargo run -p beet-cli --features=feat1,feat2 -- arg1 arg2`
-- when editing bsx files use the installed `beet` cli, ie `beet arg1 arg2`.
-- when writing documentation, a runnable example command is plain `beet --main=..`: each entry declares its features with `<CrateCheck>`, so a copy-paste command needs no `beet --features=..`. Mention `--features` only to explain the verification mechanism, never in the runnable command itself.
-- in the case of `beet --features`, this will check that beet has these features enabled and error if it doesnt.
-- Install the beet cli via `cargo install --path crates/beet-cli --all-features`.
-- `--main` accepts an entry file (`--main=examples/hello/main.bsx`) or a directory probed for `main.bsx` (`--main=examples/hello`); with no `--main` discovery walks the cwd and its ancestors.
-- An entry that mounts paths outside its own directory declares `<StoreRoot src="../.."/>` (there is no `--root` flag), and declares its required features with `<CrateCheck features="thread,sockets"/>`.
-- Install the browser binary with `beet build-wasm --release --package=beet-cli --bin=beet --features=web_examples,web_head --out=assets/wasm/beet.wasm` (the artifact every wasm example mounts). `build-wasm` is target-agnostic, so package/features/out are always explicit, never defaulted to a beet binary.
+- never use `println!`, it is silent in wasm. Informational logging uses the `log` macros `error!`/`warn!`/`info!`/`debug!`; `cross_log!` is ONLY for output that must not carry a log prefix (a streamed response body, the program's actual result). Temp dumps: `foo.xprint()`; control-flow log points: `breakpoint!()`.
+- In wasm, `app.run()` immediately returns `AppExit::Success`; use `app.run_async()` to run to completion.
+- when a bug is found in actual usage of a feature (examples, `site/`), it is not enough to fix it: isolate it, understand it and add tests to avoid regression.
 
 ## Bevy Cheatsheet
 
-- Observers can accept closures that accept their enviromnent, but systems cannot. Instead use input parameters: `fn my_system(foo: In<Foo>,...){}`;
-- when spawning entities prefer to use world.spawn((ParentComponent,children![(ChildComponent,..)])) instead of calling spawn again for the child with ChildOf(), unless the child entity needs to be tracked for the test.
-- Traversal. traversing entity hierarchies can quickly become a mess. for anything remotely complex just formalize it with a SystemParam, see `card_query.rs` for a good example of this. Avoid traversing using world directly, instead run a system, ie `world.run_system_once(|ancestors:Query<&ChildOf>| ... let root = ancestors.root(entity))`. also we have many existing traversal helpers ie AncestorQuery,
-- often a world.with_state::<MyQuery>(|my_query|{}) is more ergonomic than world.run_system_once(|my_query:MyQuery|{..});
-- Prefer Populated over Query which will skip system running if that query is empty, if its an 'any of these queries' pattern, use my_system.run_if(|a,b|!a.is_empty() || !b.is_empty()..)
-- A `#[template]` is a constructor returning `impl Bundle`, not a UI/content-only thing. `#[template(system)]` takes `SystemParam`s (`Commands`, queries, resources) and can do arbitrary ECS work at build time, eg spawn child entities or inject routes. Prefer a `<MyThing/>` template over a bespoke reflect-marker + `On<Insert>` observer for markup-spawnable setup: it expands away at build, leaving no component to re-fire on scene reload.
-- Templates may also return `()` for effects, or Result<impl Bundle> if fallible
-- Component hooks: `#[component(on_add = ...)]` accepts a call yielding a closure, so use the constructors instead of a bespoke `fn on_add(world: DeferredWorld, cx: HookContext)`: `observe(my_observer)` / `observe((obs_a, obs_b))` registers observers watching the entity, `entity_hook(|entity| { ... })` runs any `EntityCommands` work. Both live in `beet_core::bevy_utils::hook_ext`.
-
-## Action Cheatsheet
-
-- An entity holds **at most one** action, and `ActionMeta` describes it (immutable, so every change is an insert `Insert<ActionMeta>` consumers can observe). `Action` is the only producer of `ActionMeta` (inserting it inserts the meta, removing it removes the meta); a second action with a different handler raises a clobber error rather than silently taking the slot.
-- Extra signatures for the same behaviour go on an `ActionOverload<In, Out>`, which holds a full `Action<In, Out>` adapting the canonical action, registers its pair in `ActionMeta.overloads`, and delegates to the canonical action directly (never back through resolution). `ActionMeta::matches::<In, Out>()` is the single matching predicate.
-- Resolution is **self-only**: `entity.call::<In, Out>(input)` takes the entity's canonical `Action<In, Out>`, else its `ActionOverload<In, Out>`. `ActionOf` / `Actions` mean agent targeting and nothing else.
-- A provider (`ContinueRun`, `Router`, `StartOnLoad`, every `#[action]` component) guards its `#[require]`d action with `#[component(on_add = Action::<In, Out>::assert_provider::<Self>)]`, since `#[require]` silently yields to a colocated explicit component. Middleware (a `Next` in its input) claims no slot at all: it pushes onto the host's `MiddlewareList`.
-- Servers (`HttpServer`, `CliServer`, `TuiServer`, ...) own the boot and the dispatch host is their **child**: each requires `StartOnLoad`, which parks a `Running<Response>` and fans `StartRunning<Request>` out to every server on the entity. One server reads as `<HttpServer><Router>..</Router></HttpServer>`, several as `<StartOnLoad {(A, B)}><Router>..</Router></StartOnLoad>`. A `--server` selecting nothing exits rather than parking.
-- `exchange()` calls *this* entity's `Request -> Response` action; `exchange_child()` is the downward hop a server uses to reach the first child serving that pair.
-- `CallOnLoad` is the one load verb: on the entity's `LoadTemplate` it calls the entity's action with the process request (`Request::from_cli_args`) and streams/exits. It tries `Request -> Response`, then `() -> Outcome` (`Pass` exits zero, `Fail` nonzero), then `() -> ()`, so a behavior scene is just `<Sequence {CallOnLoad}>`.
+- Observers can accept closures capturing their environment, systems cannot: use input parameters, `fn my_system(foo: In<Foo>, ..)`.
+- prefer `world.spawn((Parent, children![(Child, ..)]))` over a second spawn with `ChildOf`, unless the child entity needs tracking.
+- Formalize any remotely complex traversal as a `SystemParam` (see `card_query.rs`) or use the existing helpers (`AncestorQuery`, ..); avoid traversing with world directly, use `world.run_system_once(..)` or the often more ergonomic `world.with_state::<MyQuery>(|my_query| ..)`.
+- Prefer `Populated` over `Query`, which skips the system when the query is empty; for an 'any of these queries' pattern use `.run_if(|a, b| !a.is_empty() || !b.is_empty())`.
+- A `#[template]` is a constructor returning `impl Bundle` (or `()` for effects, or `Result<impl Bundle>`), not a UI-only thing; `#[template(system)]` takes `SystemParam`s and does arbitrary ECS work at build time. Prefer a `<MyThing/>` template over a reflect-marker + `On<Insert>` observer: it expands away at build, leaving no component to re-fire on scene reload.
+- Component hooks: `#[component(on_add = ...)]` accepts a call yielding a closure: use the constructors in `beet_core::bevy_utils::hook_ext`, `observe(my_observer)` for observers watching the entity, `entity_hook(|entity| ..)` for `EntityCommands` work.
+- A command aimed at an entity another task may despawn (a server's connections) must tolerate its absence: `try_insert`, `try_remove`, `try_trigger_target`. `EntityWorldMut::despawn` flushes the queue *after* removing the entity, so an observer's deferred command routinely lands on a gone target, a panic under the default error handler.
 
 ## BSX Cheatsheet
 
-- Use the most prominent type in a position. `<div>` is a UI element, never a generic wrapper to hang the real type off a spread.
-	- bad: `<div {(Route{path:"deploy"}, ExchangeSequence)}>`
-	- good: `<Route path="deploy" {ExchangeSequence}>`
-- When no component/resource/template fits a position (a plain grouping), use `<Template>`, not `<div>`.
-- `<Tag/>` resolves a component/template by short type path and spawns its own entity; `{Spread}` / `{(A, B)}` adds components to the *current* entity. String attributes coerce to the field type (`SmolStr`, `SmolPath`, `Duration` from `"30s"`, an `Option<T>` wrapping the value, an enum unit variant by name), so a reflect component is usually authorable directly without a template.
+- **Every entity is authored under the tag of the type it most *is*.** `<div>`/`<span>` mean "this paints as a box of text" and are never a generic carrier to hang the real type off a spread. This applies in every position: a behavior loop is `<Repeat>`, a thread is `<Thread>`, a route is `<Route>`; whatever is left over rides a `{spread}` on that same entity.
+	- bad: `<div {(Route{path:"deploy"}, ExchangeSequence)}>`; good: `<Route path="deploy" {ExchangeSequence}>`
+	- between co-located types the entity's **action** wins (one action per entity, see `beet_action`): `<Repeat {RunThread}>`, not `<RunThread {Repeat}>`. Absent an action, the noun the entity names wins: `<Thread {(Sequence, FsStore{path:".."})}>`.
+- A generic type resolves by base name to its sole registered instantiation, as a tag exactly as in a spread, so `<Repeat>`, `<Sequence>` and `<RepeatTimes total_times=2>` all author directly.
+- For a plain grouping use `<Fragment>`, not `<div>`: it carries spreads, directives and children but emits no element. (`<Template>` is the *include* front-end, `<Template src="..">`; with no `src` a directives-only no-op.)
+- `<Tag/>` resolves a component/template by short type path and spawns its own entity; `{Spread}` / `{(A, B)}` adds components to the *current* entity. String attributes coerce to the field type (`SmolStr`, `Duration` from `"30s"`, `Option<T>`, enum unit variants), so a reflect component is usually authorable without a template.
 - A `<Tag>`'s children land as its direct children (slots are transparent), so a child-reading handler like `{ExchangeSequence}` (a sequenced route) reads them: `<Route path="deploy" {ExchangeSequence}><MyBlock/><MyAction/></Route>`.
-
-## Styling Cheatsheet
-
-- Colocate a widget's classes with the widget, not in a central rules file. A widget owns its styling.
-- If a widget has only one class, use `inline_class!` rather than registering a named rule. A plain declaration is a `(prop, value)` pair; to point a prop at a design token use `token(prop, value)`, ie `token(BackgroundColor, colors::InverseSurface)`.
-- Put the `inline_class!` in a helper function (eg `fn toast_style() -> impl Bundle`) when it is more than two tokens long; keep it inline at the call site otherwise.
+- **Features remove components, never entities.** A document loads whole in every binary; there is no feature gating. An unregistered uppercase tag warns, marks its entity `UnregisteredTag` and still builds its directives, spreads and children, so a lean binary's tree keeps its shape, only behavior missing. Loudness comes at dispatch: `{RequireFeatures(["infra"])}` on a subtree fails dispatch naming the missing features; a sequence route that skipped every child fails naming unregistered tags; `beet check` elevates `UnregisteredTag` to an error. `<CrateCheck features={[".."]}/>` is the load-time inverse, an entry *demanding* features; `allow_unregistered` opts out a tag whose whole content is the missing behavior (`<LiveReloadScript/>`).
+- A `Router` is a **url space**: its subtree's routes root at it (no ancestor `<Route>` prepends) and it owns its own `RouteTree`, so a whole site mounts under a command route with urls still rooted at `/`, and a dispatching surface can never reach routes outside its namespace. Resolve with `RouteTree::of` (a server's tree lives on its `Router` child), not `entity.get::<RouteTree>()`.
 <!-- beet:sync:end -->

@@ -14,19 +14,17 @@ The root `beet_atproto` crate re-exports all three behind `client`/`feed` featur
 use beet::prelude::*;
 use beet_atproto::prelude::*;
 
-commands
-	.spawn((HttpServer::default(), children![(
-		Router::with_defaults(),
+commands.spawn((HttpServer::default(), CallOnReady::on_spawn(), children![(
+	Router::with_defaults(),
+	children![(
+		feed_generator(FeedGenerator::new("feed.example.com", "did:plc:me")),
 		children![(
-			feed_generator(FeedGenerator::new("feed.example.com", "did:plc:me")),
-			children![(
-				FeedDef::new("whats-alf"),
-				ChronologicalFeed,
-				PostFilter::text_contains("alf"),
-			)],
+			FeedDef::new("whats-alf"),
+			ChronologicalFeed,
+			PostFilter::text_contains("alf"),
 		)],
-	)]))
-	.trigger(StartRunning::from_cli);
+	)],
+)]));
 commands.spawn(Jetstream::default());
 ```
 

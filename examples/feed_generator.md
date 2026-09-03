@@ -39,23 +39,22 @@ fn main() -> AppExit {
 }
 
 fn setup(mut commands: Commands) {
-	// the server owns the boot, the router and the feed ride underneath it
-	commands
-		.spawn((HttpServer::default(), children![(
-			Router::with_defaults(),
+	// the server owns the boot, the router and the feed ride underneath it,
+	// and `CallOnReady` is what starts it
+	commands.spawn((HttpServer::default(), CallOnReady::on_spawn(), children![(
+		Router::with_defaults(),
+		children![(
+			feed_generator(FeedGenerator::new(
+				"example.com",
+				"did:example:alice"
+			)),
 			children![(
-				feed_generator(FeedGenerator::new(
-					"example.com",
-					"did:example:alice"
-				)),
-				children![(
-					FeedDef::new("whats-alf"),
-					ChronologicalFeed,
-					PostFilter::text_contains("alf"),
-				)],
+				FeedDef::new("whats-alf"),
+				ChronologicalFeed,
+				PostFilter::text_contains("alf"),
 			)],
-		)]))
-		.trigger(StartRunning::from_cli);
+		)],
+	)]));
 
 	// the firehose, feeding every matching post into the index above
 	commands.spawn(Jetstream::default());
