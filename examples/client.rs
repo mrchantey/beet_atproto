@@ -97,6 +97,9 @@ fn main() -> AppExit {
 		.init_plugin::<ThreadUiPlugin>()
 		// the pages bind their status line to this by name
 		.register_type::<FeedStatus>()
+		// the document layout, resolved by short type path from the `Layout`
+		// middleware below
+		.register_template::<FeedLayout>()
 		.add_systems(Startup, setup)
 		.run()
 }
@@ -410,7 +413,7 @@ fn resolve_actor(window: &mut ThreadWindow, author: &ProfileViewBasic) -> ActorI
 
 fn routes() -> impl Bundle {
 	(
-		BaseLayout::<FeedLayout>::default(),
+		Layout::of::<FeedLayout>(),
 		children![
 			render_action::async_route("", feed_page),
 			render_action::system_route("live", live_page)

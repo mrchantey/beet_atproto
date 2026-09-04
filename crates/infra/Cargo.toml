@@ -1,0 +1,30 @@
+[package]
+name = "beet_atproto_infra"
+version.workspace = true
+edition.workspace = true
+description = "AT Protocol deploy blocks for the beet infrastructure stack"
+
+[dependencies]
+beet_atproto_client = { workspace = true }
+beet_atproto_shared = { workspace = true }
+# `infra` is the block machinery, `cloudflare_dns` the `DnsProvider` the records
+# are emitted through; `action`/`net` are the probe, which is an http read like
+# any other and so needs no `deploy` (nothing here shells out).
+beet = { workspace = true, features = [
+	"std",
+	"json",
+	"net",
+	"action",
+	"infra",
+	"cloudflare_dns",
+] }
+serde = { workspace = true }
+
+[dev-dependencies]
+# `bsx` is the markup test: an unregistered tag resolves to nothing and still
+# builds, so a registration regression is only visible by parsing a document.
+beet = { workspace = true, features = ["testing", "bsx"] }
+serde_json = { workspace = true }
+
+[lib]
+harness = false

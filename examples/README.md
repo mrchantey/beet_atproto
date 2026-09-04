@@ -55,6 +55,7 @@ Your service never sees post text on the way out, and never stores a post it did
 
 - [Read a feed](./client.md) builds a client. No account, no keys, no server. Start here.
 - [Run a feed generator](./feed_generator.md) ingests the firehose, serves a skeleton, and optionally publishes the feed to a real account.
+- [Point a custom domain at your account](./infra/custom_handle_domain.bsx) is not a program but a deploy: it publishes the one DNS record that turns a domain you own into your handle, so `alice.bsky.social` becomes `alice.example.com`. Its walkthrough is the header comment of the file itself, manual steps included, and it needs a domain on a Cloudflare zone.
 
 Both use `beet_atproto`, this repository's crates, the beet equivalent of Bluesky's official [feed-generator](https://github.com/bluesky-social/feed-generator) starter kit. It is pre-release and unpublished, so a standalone project points cargo at the local checkouts by path; each tutorial's setup section shows the exact dependencies.
 

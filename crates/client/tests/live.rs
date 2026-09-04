@@ -19,7 +19,9 @@ async fn appview_hydrates_live() {
 		.await
 		.unwrap()
 		.feed;
-	page.len().xpect_eq(3);
+	// the appview omits entries it will not serve (deleted, moderated), so a
+	// page is AT MOST the limit asked for rather than exactly it
+	page.len().xpect_greater_than(0).xpect_less_or_equal_to(3);
 	page.iter()
 		.all(|item| !item.post.author.handle.is_empty())
 		.xpect_true();
@@ -36,4 +38,19 @@ async fn appview_hydrates_live() {
 		.map(|post| post.uri.clone())
 		.collect::<Vec<_>>()
 		.xpect_eq(uris);
+}
+
+/// The handle a custom domain publishes, resolved through the same call the
+/// deploy's handle probe makes. `bsky.app` is itself a custom-domain handle
+/// (the account behind the Discover feed), so this asserts the whole
+/// dns-record-to-did path against a name nobody is going to retire.
+#[ignore = "requires external network"]
+#[beet::test(timeout_ms = 60_000)]
+async fn resolves_a_custom_domain_handle_live() {
+	AppView::default()
+		.resolve_handle("bsky.app")
+		.await
+		.unwrap()
+		.as_str()
+		.xpect_eq(AtUri::parse(DISCOVER_FEED_URI).unwrap().authority.as_str());
 }

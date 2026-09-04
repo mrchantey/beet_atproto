@@ -4,6 +4,8 @@
 pub use beet_atproto_client as client;
 #[cfg(feature = "feed")]
 pub use beet_atproto_feed as feed;
+#[cfg(feature = "infra")]
+pub use beet_atproto_infra as infra;
 pub use beet_atproto_shared as shared;
 
 /// Exports the most commonly used items.
@@ -12,6 +14,8 @@ pub mod prelude {
 	pub use crate::client::prelude::*;
 	#[cfg(feature = "feed")]
 	pub use crate::feed::prelude::*;
+	#[cfg(feature = "infra")]
+	pub use crate::infra::prelude::*;
 	// client/feed preludes already re-export shared's, so a direct re-export
 	// only when both are off
 	#[cfg(not(any(feature = "client", feature = "feed")))]

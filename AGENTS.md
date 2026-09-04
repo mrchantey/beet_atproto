@@ -1,6 +1,6 @@
 # beet_atproto
 
-An AT Protocol (Bluesky) toolkit for the [beet](https://github.com/mrchantey/beet) engine: `crates/shared` wire types, `crates/client` AppView reads, `crates/feed` the feed generator, re-exported by the root `beet_atproto` facade crate.
+An AT Protocol (Bluesky) toolkit for the [beet](https://github.com/mrchantey/beet) engine: `crates/shared` wire types, `crates/client` AppView reads, `crates/feed` the feed generator, `crates/infra` the deploy blocks (`<AtprotoHandleBlock/>`, the custom-domain handle records), re-exported by the root `beet_atproto` facade crate. The root package is also a binary: the stock beet cli plus `AtprotoInfraPlugin`, since an entry naming a block defined here can only run from a binary that links it.
 
 ## Context
 
@@ -8,19 +8,20 @@ This is a downstream library of the primary beet project at `/home/pete/me/beet`
 
 Downstream deltas from the inherited conventions:
 
-- Depend on the `beet` facade, never the individual beet crates: external `#[action]`/`#[template]` macro expansions emit `beet::` paths, which only resolve against the facade.
+- Depend on the `beet` facade, never the individual beet crates: external `#[action]`/`#[template]` macro expansions emit `beet::` paths, which only resolve against the facade. The one exception is the root package's `beet-cli` dependency, which is the app harness sitting above the facade and reaches only `beet_cli::launch::app`; it is a `cli`-feature dependency of the binary, never of a library crate.
 - Tests use `#[beet::test]` and `beet::test_main!()`, the facade re-exports of the beet_core harness. Lib crates gate the `test_main!` invocation behind `#[cfg(test)]` so plain builds do not need the facade's `testing` feature.
 - Direct bevy paths go through `beet::exports::bevy`.
 
 ## Commands
 
-- `just test`: the three crates' native suites
+- `just test`: the workspace crates native suites
 - `just test-live`: live network tests against public Bluesky infrastructure
 - `just build-wasm`: wasm builds of the lib crates
 - `cargo run --example feed_generator`: serve a whats-alf feed on 8337
 - `cargo run --example client`: read it (or Bluesky's published whats-hot fallback) on 8338
+- `just cli --main=examples/infra/custom_handle_domain.bsx --stage=prod validate`: the handle deployer, ie `cargo run --features=cli --`
 
-The examples double as the tutorial walkthroughs in `examples/*.md`, starting at `examples/README.md`.
+The examples double as the tutorial walkthroughs in `examples/*.md`, starting at `examples/README.md`; the deploy entry carries its walkthrough in its own header comment.
 
 <!-- beet:sync:begin — beet's AGENTS.md, refreshed by the sync-downstream skill; do not hand-edit -->
 # Agent Instructions

@@ -1,0 +1,131 @@
+<!--
+# Custom Domain Handle
+
+Point a custom-domain atproto handle (`alice.example.com`) at a Bluesky
+account. The account itself lives on bsky.social and is not declared here: the
+ONE piece of infrastructure a custom-domain handle needs is a DNS TXT record,
+`_atproto.alice.example.com` holding `did=did:plc:...`, declared below and
+published by `deploy`.
+
+## Prerequisites
+
+A domain on a Cloudflare zone, `tofu` on PATH, and a `.env` carrying
+`CLOUDFLARE_ZONE_ID` and `CLOUDFLARE_API_TOKEN`. Nothing else, and less than
+that for most of the walk: this stack declares no AWS resource at all,
+`<StateBackendToggle/>` keeps the tofu state under `.beet/infra` unless
+`--s3-backend` is passed, and state encryption is off so there is no
+passphrase. Only the apply inside `deploy` authenticates, so `validate` and
+`plan` run on `tofu` alone.
+
+## Walkthrough
+
+1. Create the account at <https://bsky.social> (or in the app) under any
+   temporary handle, and verify its email. Manual, once.
+2. Find its did. Settings -> Account shows it, or ask the same resolver the
+   probe below asks:
+   `https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=<temp>.bsky.social`
+3. Declare it: replace `example.com` and the `{name, did}` entry below with the
+   domain you own and the did from step 2.
+4. Run it. `just cli` is `cargo run --features=cli --`, ie this workspace's own
+   beet binary, which is the stock cli plus the block declared below:
+
+       just cli --main=examples/infra/custom_handle_domain.bsx --stage=prod validate
+       just cli --main=examples/infra/custom_handle_domain.bsx --stage=prod plan
+       just cli --main=examples/infra/custom_handle_domain.bsx --stage=prod deploy
+
+   `deploy` ends in `<AtprotoHandleProbe/>`, so it passes only once the handle
+   actually resolves to the declared did through Bluesky's own resolver, which
+   is the same walk the app makes. DNS takes a moment: a probe that fails
+   immediately after the apply usually just needs re-running (`probe`).
+5. Claim it in the app: Settings -> Handle -> "I have my own domain" ->
+   `alice.example.com` -> Verify DNS Record. Manual, once. The temporary handle
+   is released back to bsky.social.
+
+`--stage=prod` is not decoration, see the `dns_stage` note on the block below.
+The zone id is written out only so `validate` and `plan` run against a fresh
+checkout; a real stack deletes that attribute, see the note on the block.
+
+## Teardown
+
+Remove the handle from the declaration and re-run `deploy`; the record retires
+with it. Switch the account back to a `*.bsky.social` handle in the app FIRST,
+or its sessions keep working while its handle displays as invalid.
+
+## One entry owns a zone
+
+`<ZoneAudit/>` asserts that its own stack's declarations are exactly what the
+zone holds, so a handle record published from here reads as a stray to any
+other beet entry auditing the same zone: that entry's `audit` reports it, and
+its `audit --fix` DELETES it. If your zone already belongs to another entry (a
+mail stack, say), declare the `<AtprotoHandleBlock/>` inside THAT entry's stack
+beside its other tags rather than copying this one, or add the `_atproto.*`
+names to its audit allowlist with a reason. The block is its own tag precisely
+so it can be authored wherever the zone's owner is.
+-->
+<CliServer {CallOnReady}>
+<Router {(RequestLogger, HelpHandler)}>
+	<CrateCheck features={["infra", "extra", "beet_atproto/infra"]}/>
+	<PackageConfig title="Custom Domain Handle" app_name="atproto-handles"
+		description="Publish the _atproto records that make a domain you own an atproto handle"/>
+	<!-- the state backend is a property of the LAUNCH, not of a stack's identity,
+	     so the toggle sits outside the stack and lands on the process `Deployment`.
+	     Local by default, which is what keeps this stack Cloudflare-only. -->
+	<StateBackendToggle/>
+	<!-- no region: the only resources here are dns records in a Cloudflare zone,
+	     so nothing composes an AWS name and nothing is deployed into a region. -->
+	<Stack app_name="atproto-handles">
+		<!-- the standard IaC verbs (validate / plan / apply / ... / destroy),
+		     resolving this <Stack> by ancestry. -->
+		<DeployRoutes/>
+
+		<!-- 💡 the whole declaration. One TXT record per handle, at
+		     `_atproto.<name>.<domain>`, holding `did=<did>`.
+
+		     `dns_stage="prod"` because a handle record is a REAL global name,
+		     exactly like a mail name: `_atproto.alice.example.com` is the only
+		     record that makes that handle work, so a second stage deploying this
+		     same declaration would publish a second TXT record at it and the
+		     handle would stop resolving deterministically. Outside `prod` this
+		     block therefore publishes nothing at all, which is why every command
+		     above passes `--stage=prod`.
+
+		     `dns` is written out only so the example validates with nothing
+		     configured, which is also why it repeats the domain. A real stack
+		     omits it entirely and sets `CLOUDFLARE_ZONE_ID`: which zone a launch
+		     writes into is a property of the launch, not of any declaration. -->
+		<AtprotoHandleBlock domain="example.com" dns_stage="prod"
+			dns={Cloudflare{authority:"example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
+			handles={[{name:"alice", did:"did:plc:REPLACE-ME-WITH-A-REAL-DID"}]}/>
+
+		<Route path="deploy" {ExchangeSequence}>
+			<TofuApply/>
+			<AtprotoHandleProbe/>
+		</Route>
+
+		<!-- the probe on its own: cheap, read-only and the honest answer to "is
+		     the handle still wired up", which nothing about a converged record
+		     can tell you. -->
+		<Route path="probe" {ExchangeSequence}>
+			<AtprotoHandleProbe/>
+		</Route>
+
+		<!-- 💡 the zone holds exactly what this stack declares, plus what it was
+		     told to expect. Everything allowed below is a decision with a reason;
+		     a zone serving a website has at least these, and they are nothing to
+		     do with handles. Run with `--fix` to delete the strays rather than
+		     report them, and read the header's ownership note first. -->
+		<Route path="audit" {ExchangeSequence}>
+			<ZoneAudit allowed={[
+				{name:"example.com", record_type:"A",
+					reason:"the apex website, owned by whoever deploys the site"},
+				{name:"www.example.com",
+					reason:"the www hostname, same owner as the apex"},
+				{name:"example.com", record_type:"MX",
+					reason:"the domain's mail, owned by its mail provider"},
+				{name:"example.com", record_type:"TXT",
+					reason:"the apex SPF and any domain-ownership verification"},
+			]}/>
+		</Route>
+	</Stack>
+</Router>
+</CliServer>

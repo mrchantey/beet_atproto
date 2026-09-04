@@ -1,4 +1,6 @@
 target
+# the local tofu state backend the deploy entries default to
+.beet/infra
 .agents/*
 !.agents/skills
 .env

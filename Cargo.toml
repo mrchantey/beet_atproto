@@ -9,11 +9,17 @@ edition = "2024"
 beet_atproto_shared = { path = "crates/shared", version = "0.1.0" }
 beet_atproto_client = { path = "crates/client", version = "0.1.0" }
 beet_atproto_feed = { path = "crates/feed", version = "0.1.0" }
+beet_atproto_infra = { path = "crates/infra", version = "0.1.0" }
 # The local beet checkout, like beet_esp. Crates depend on the `beet` facade
 # rather than the individual beet crates so `#[action]`/`#[template]` macro
 # expansions (which emit `beet::` paths downstream) resolve; each crate turns
 # on only the facade features it needs.
 beet = { path = "../beet", default-features = false }
+# The one sanctioned non-facade beet dependency, and only for the binary: the
+# cli is the app harness that sits ABOVE the facade, so a workspace extending
+# beet with reflect types of its own runs an entry through `beet_cli::launch`
+# with those types linked in.
+beet-cli = { path = "../beet/crates/beet-cli", default-features = false }
 
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_json = { version = "1", default-features = false, features = ["alloc"] }
@@ -40,6 +46,15 @@ description = "An AT Protocol (Bluesky) toolkit for the beet engine"
 default = ["client", "feed"]
 client = ["dep:beet_atproto_client"]
 feed = ["dep:beet_atproto_feed"]
+# The deploy blocks: `<AtprotoHandleBlock/>` and the probe that asserts its
+# records resolve. The probe reads handles through the AppView, so it carries
+# `client` with it.
+infra = ["dep:beet_atproto_infra", "client"]
+# This workspace's own beet binary: the stock cli runner plus `AtprotoInfraPlugin`,
+# so an entry declaring `<AtprotoHandleBlock/>` resolves it. Off by default, so a
+# library consumer never links the cli; the `[[bin]]` below requires it, which is
+# what makes a flagless `cargo run` fail with cargo's own guidance.
+cli = ["infra", "ureq", "rustls-tls", "dep:beet", "dep:beet-cli"]
 # transports forwarded to the beet stack: the jetstream `wss://` socket and the
 # xrpc `https://` clients
 tungstenite = ["beet_atproto_feed?/tungstenite"]
@@ -51,6 +66,12 @@ ureq = ["beet_atproto_client?/ureq", "beet_atproto_feed?/ureq"]
 beet_atproto_shared = { workspace = true }
 beet_atproto_client = { workspace = true, optional = true }
 beet_atproto_feed = { workspace = true, optional = true }
+beet_atproto_infra = { workspace = true, optional = true }
+
+# the binary's own dependencies, inert without `cli`. `net` is the cli's http
+# client + tls, which the handle probe reads the AppView through.
+beet = { workspace = true, optional = true, features = ["std"] }
+beet-cli = { workspace = true, optional = true, features = ["net", "infra", "extra"] }
 
 [dev-dependencies]
 # everything the examples need, so `cargo run --example ..` needs no flags
@@ -83,3 +104,14 @@ required-features = ["feed"]
 name = "client"
 path = "examples/client.rs"
 required-features = ["client"]
+
+# 💡 Binary
+
+# This workspace's beet cli: `beet_cli::launch::app` plus `AtprotoInfraPlugin`.
+# The stock `beet` binary serves a workspace that only names beet types; a
+# workspace that EXTENDS beet builds its own, which is exactly what a block
+# defined out of tree needs.
+[[bin]]
+name = "beet_atproto"
+path = "src/main.rs"
+required-features = ["cli"]

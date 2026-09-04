@@ -7,8 +7,9 @@ A feed generator is a service that answers `app.bsky.feed.getFeedSkeleton` with 
 - `crates/shared` (`beet_atproto_shared`): the wire types, `AtUri`, the `getFeedSkeleton` shapes and the `app.bsky.feed.post` record fields.
 - `crates/client` (`beet_atproto_client`): `AppView`, unauthenticated hydrated reads through the public Bluesky AppView, and `FeedFollow`, polling a feed without repeats.
 - `crates/feed` (`beet_atproto_feed`): the generator: `Jetstream` firehose ingestion into `PostFilter` + `PostIndex` feeds, the xrpc skeleton routes (`feed_generator`), and the `PublishFeed` declaration record flow.
+- `crates/infra` (`beet_atproto_infra`): the deploy blocks. `AtprotoHandleBlock` publishes the `_atproto` TXT records that make a domain you own an atproto handle, and `AtprotoHandleProbe` asserts they resolve.
 
-The root `beet_atproto` crate re-exports all three behind `client`/`feed` features (both on by default), with `tungstenite`/`ureq`/`native-tls`/`rustls-tls` forwarding transports to the beet stack.
+The root `beet_atproto` crate re-exports all workspace crates behind `client`/`feed`/`infra` features (the first two on by default), with `tungstenite`/`ureq`/`native-tls`/`rustls-tls` forwarding transports to the beet stack. It is also a binary, behind the `cli` feature: the stock beet cli plus `AtprotoInfraPlugin`, since an entry naming a block defined here can only run from a binary that links it.
 
 ```rust,ignore
 use beet::prelude::*;
@@ -39,9 +40,15 @@ cargo run --example client
 
 The tutorials alongside them start at `examples/README.md`: an AT Protocol primer, then reading a feed, then running a generator.
 
+A third example is a deploy rather than a program. `examples/infra/custom_handle_domain.bsx` points a custom-domain handle (`alice.example.com`) at a Bluesky account, which is one DNS TXT record; its header comment is the whole walkthrough, manual steps included.
+
+```sh
+just cli --main=examples/infra/custom_handle_domain.bsx --stage=prod validate
+```
+
 ## Testing
 
 ```sh
-just test        # native suites for the three crates
+just test        # native suites for the workspace crates
 just test-live   # live network tests against public Bluesky infrastructure
 ```

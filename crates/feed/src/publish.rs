@@ -72,8 +72,7 @@ impl PublishFeed {
 	/// Publish the declaration record, returning its at uri.
 	pub async fn publish(self) -> Result<AtUri> {
 		let session = self.create_session().await?;
-		let record =
-			self.record_json(&time_ext::format_iso8601(time_ext::now()));
+		let record = self.record_json(&Timestamp::now().format_iso8601());
 		Request::post(format!(
 			"{}/xrpc/com.atproto.repo.putRecord",
 			self.service
