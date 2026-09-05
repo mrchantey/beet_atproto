@@ -8,7 +8,7 @@ This is a downstream library of the primary beet project at `/home/pete/me/beet`
 
 Downstream deltas from the inherited conventions:
 
-- Depend on the `beet` facade, never the individual beet crates: external `#[action]`/`#[template]` macro expansions emit `beet::` paths, which only resolve against the facade. This holds for the binary too: it runs an entry through `beet::launch::app`, the facade's own runner, so nothing here depends on `beet-cli`.
+- Depend on the `beet` facade, never the individual beet crates: external `#[action]`/`#[template]` macro expansions emit `beet::` paths, which only resolve against the facade. This holds for the binary too: it composes `BeetPlugins`, `AtprotoInfraPlugin` and `LaunchPlugin` from the facade, so nothing here depends on `beet-cli`.
 - Tests use `#[beet::test]` and `beet::test_main!()`, the facade re-exports of the beet_core harness. Lib crates gate the `test_main!` invocation behind `#[cfg(test)]` so plain builds do not need the facade's `testing` feature.
 - Direct bevy paths go through `beet::exports::bevy`.
 

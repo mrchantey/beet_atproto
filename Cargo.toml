@@ -45,7 +45,8 @@ feed = ["dep:beet_atproto_feed"]
 # records resolve. The probe reads handles through the AppView, so it carries
 # `client` with it.
 infra = ["dep:beet_atproto_infra", "client"]
-# This workspace's own beet binary: `beet::launch::app` plus `AtprotoInfraPlugin`,
+# This workspace's own beet binary: `BeetPlugins` + `AtprotoInfraPlugin` +
+# `LaunchPlugin`,
 # so an entry declaring `<AtprotoHandleBlock/>` resolves it. Off by default, so a
 # library consumer never links the runner; the `[[bin]]` below requires it, which
 # is what makes a flagless `cargo run` fail with cargo's own guidance.
@@ -118,7 +119,8 @@ required-features = ["client"]
 
 # 💡 Binary
 
-# This workspace's beet binary: `beet::launch::app` plus `AtprotoInfraPlugin`.
+# This workspace's beet binary: `BeetPlugins` + `AtprotoInfraPlugin` +
+# `LaunchPlugin`.
 # The stock `beet` binary serves a workspace that only names beet types; a
 # workspace that EXTENDS beet builds its own, which is exactly what a block
 # defined out of tree needs.

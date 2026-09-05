@@ -3,8 +3,8 @@
 //! The stock `beet` binary serves any entry whose tags it can resolve, which is
 //! every type beet itself registers. An entry declaring `<AtprotoHandleBlock/>`
 //! names a type defined in THIS workspace, which no beet build can know, so the
-//! workspace that defines it builds the binary that runs it: the same
-//! [`launch::app`] the stock binary uses, with [`AtprotoInfraPlugin`] linked in.
+//! workspace that defines it builds the binary that runs it by composing the
+//! stock plugins with [`AtprotoInfraPlugin`].
 //!
 //! Run it through the justfile, which threads the feature flag:
 //!
@@ -17,7 +17,8 @@ use beet_atproto::prelude::*;
 fn main() -> AppExit {
 	// load any local `.env` (ie CLOUDFLARE_ZONE_ID) before the app starts.
 	env_ext::load_dotenv().ok();
-	let mut app = launch::app(AtprotoInfraPlugin);
+	let mut app = App::new();
+	app.add_plugins((BeetPlugins, AtprotoInfraPlugin, LaunchPlugin));
 	// this binary's compiled surface, spawned before the entry loads so its
 	// `<CrateCheck/>` verifies against it. The primary registration, ie the one
 	// an unprefixed requirement resolves to.
