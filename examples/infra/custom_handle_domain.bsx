@@ -64,7 +64,7 @@ so it can be authored wherever the zone's owner is.
 -->
 <CliServer {CallOnReady}>
 <Router {(RequestLogger, HelpHandler)}>
-	<CrateCheck features={["infra", "extra", "beet_atproto/infra"]}/>
+	<CrateCheck features={["cli", "infra"]}/>
 	<PackageConfig title="Custom Domain Handle" app_name="atproto-handles"
 		description="Publish the _atproto records that make a domain you own an atproto handle"/>
 	<!-- the state backend is a property of the LAUNCH, not of a stack's identity,

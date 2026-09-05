@@ -1,4 +1,4 @@
-//! This workspace's beet cli: the stock runner plus the atproto deploy types.
+//! This workspace's beet binary: the stock runner plus the atproto deploy types.
 //!
 //! The stock `beet` binary serves any entry whose tags it can resolve, which is
 //! every type beet itself registers. An entry declaring `<AtprotoHandleBlock/>`
@@ -9,20 +9,23 @@
 //! Run it through the justfile, which threads the feature flag:
 //!
 //! ```sh
-//! just cli --main=examples/infra/custom_handle_domain.bsx validate
+//! just cli --main=examples/infra/custom_handle_domain.bsx --stage=prod validate
 //! ```
 use beet::prelude::*;
 use beet_atproto::prelude::*;
-use beet_cli::prelude::*;
 
 fn main() -> AppExit {
 	// load any local `.env` (ie CLOUDFLARE_ZONE_ID) before the app starts.
 	env_ext::load_dotenv().ok();
 	let mut app = launch::app(AtprotoInfraPlugin);
-	// this crate's compiled surface beside beet-cli's, so an entry may require
-	// the block registrations by name: `<CrateCheck features={["beet_atproto/infra"]}/>`.
-	app.world_mut().spawn(crate_registration!({
-		features: ["cli", "client", "feed", "infra"]
-	}));
+	// this binary's compiled surface, spawned before the entry loads so its
+	// `<CrateCheck/>` verifies against it. The primary registration, ie the one
+	// an unprefixed requirement resolves to.
+	app.world_mut().spawn(
+		crate_registration!({
+			features: ["cli", "client", "feed", "infra"]
+		})
+		.with_skip_prefix(),
+	);
 	app.run()
 }
