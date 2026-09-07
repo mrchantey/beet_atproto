@@ -24,8 +24,11 @@ passphrase. Only the apply inside `deploy` authenticates, so `validate` and
 2. Find its did. Settings -> Account shows it, or ask the same resolver the
    probe below asks:
    `https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=<temp>.bsky.social`
-3. Declare it: replace `example.com` and the `{name, did}` entry below with the
-   domain you own and the did from step 2.
+3. Declare it: replace `example.com` and the `{name, did}` entries below with
+   the domain you own and the dids from step 2. An entry with no `name` is the
+   APEX handle, ie `example.com` itself rather than a label under it, which is
+   usually what an organisation's own account wants; delete it if you only want
+   the subdomain.
 4. Run it. `just cli` is `cargo run --features=cli --`, ie this workspace's own
    beet binary, which is the stock cli plus the block declared below:
 
@@ -38,8 +41,8 @@ passphrase. Only the apply inside `deploy` authenticates, so `validate` and
    is the same walk the app makes. DNS takes a moment: a probe that fails
    immediately after the apply usually just needs re-running (`probe`).
 5. Claim it in the app: Settings -> Handle -> "I have my own domain" ->
-   `alice.example.com` -> Verify DNS Record. Manual, once. The temporary handle
-   is released back to bsky.social.
+   `alice.example.com` (or the bare `example.com` for the apex) -> Verify DNS
+   Record. Manual, once. The temporary handle is released back to bsky.social.
 
 `--stage=prod` is not decoration, see the `dns_stage` note on the block below.
 The zone id is written out only so `validate` and `plan` run against a fresh
@@ -81,6 +84,11 @@ so it can be authored wherever the zone's owner is.
 		<!-- 💡 the whole declaration. One TXT record per handle, at
 		     `_atproto.<name>.<domain>`, holding `did=<did>`.
 
+		     The first handle names no label, which is the APEX: the handle is
+		     `example.com` itself and its record is `_atproto.example.com`.
+		     Note that this is still a name UNDER the apex, not a record AT it,
+		     so an apex handle costs the zone's apex nothing.
+
 		     `dns_stage="prod"` because a handle record is a REAL global name,
 		     exactly like a mail name: `_atproto.alice.example.com` is the only
 		     record that makes that handle work, so a second stage deploying this
@@ -95,7 +103,10 @@ so it can be authored wherever the zone's owner is.
 		     writes into is a property of the launch, not of any declaration. -->
 		<AtprotoHandleBlock domain="example.com" dns_stage="prod"
 			dns={Cloudflare{authority:"example.com", zone_id:"0123456789abcdef0123456789abcdef", proxied:false}}
-			handles={[{name:"alice", did:"did:plc:REPLACE-ME-WITH-A-REAL-DID"}]}/>
+			handles={[
+				{did:"did:plc:REPLACE-ME-WITH-THE-ORG-DID"},
+				{name:"alice", did:"did:plc:REPLACE-ME-WITH-A-REAL-DID"},
+			]}/>
 
 		<Route path="deploy" {ExchangeSequence}>
 			<TofuApply/>

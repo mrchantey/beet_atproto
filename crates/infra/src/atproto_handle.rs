@@ -6,6 +6,10 @@ use beet::prelude::*;
 /// A handle always carries a did. A did is permanent and public and a handle is
 /// only a name pointed at one, so "a person who has no account yet" is not a
 /// state this type represents: they are simply not declared.
+///
+/// A handle carries a name only if it takes one. Omit it and the handle IS the
+/// domain, ie `beetmash.com` rather than `pete.beetmash.com`, which is the one
+/// handle a company account usually wants.
 #[derive(
 	Debug,
 	Default,
@@ -21,7 +25,10 @@ use beet::prelude::*;
 #[reflect(Default)]
 pub struct AtprotoHandle {
 	/// The label under the handle domain, ie the `pete` in `pete.beetmash.com`.
-	name: SmolStr,
+	/// Absent is the APEX: the handle is the bare domain, so there is no label
+	/// to declare and none to validate.
+	#[set_with(unwrap_option, into)]
+	name: Option<SmolStr>,
 	/// The account this handle resolves to, ie `did:plc:...`.
 	did: SmolStr,
 }
@@ -32,24 +39,59 @@ impl AtprotoHandle {
 	/// resolver's business, not this crate's.
 	pub const DID_PREFIX: &'static str = "did:";
 
+	/// The label an apex handle's record composes under, standing in for the
+	/// name it does not have: `beetmash-com--atproto-apex` rather than a
+	/// trailing-hyphen `atproto-`.
+	///
+	/// A handle named literally `apex` beside an apex handle composes this same
+	/// label, which the config's duplicate-resource check rejects at emit: two
+	/// records at one label is one of them silently replacing the other in
+	/// state, so it fails loudly instead.
+	pub const APEX_LABEL: &'static str = "apex";
+
 	/// A handle at `name` resolving to `did`.
 	pub fn new(name: impl Into<SmolStr>, did: impl Into<SmolStr>) -> Self {
 		Self {
-			name: name.into(),
+			name: Some(name.into()),
 			did: did.into(),
 		}
 	}
 
-	/// The handle itself, ie `pete.beetmash.com`.
-	pub fn handle(&self, domain: &str) -> String {
-		format!("{}.{domain}", self.name)
+	/// The apex handle resolving to `did`: the domain itself is the handle, so
+	/// it takes no label.
+	pub fn apex(did: impl Into<SmolStr>) -> Self {
+		Self {
+			name: None,
+			did: did.into(),
+		}
 	}
 
-	/// The record this handle is published at, ie `_atproto.pete.beetmash.com`.
-	/// Nested under the handle's own label rather than at the apex, which is
-	/// why a zone's apex-safety rules never have to make an exception for it.
+	/// The handle itself, ie `pete.beetmash.com`, or the bare `beetmash.com`
+	/// for the apex.
+	pub fn handle(&self, domain: &str) -> String {
+		match &self.name {
+			Some(name) => format!("{name}.{domain}"),
+			None => domain.to_string(),
+		}
+	}
+
+	/// The record this handle is published at, ie `_atproto.pete.beetmash.com`,
+	/// or `_atproto.beetmash.com` for the apex.
+	///
+	/// Always nested under `_atproto.`, which is a name under the apex even for
+	/// the apex handle, so a zone's apex-safety rules never have to make an
+	/// exception for it: the apex HANDLE publishes no record AT the apex.
 	pub fn record_name(&self, domain: &str) -> String {
-		format!("_atproto.{}.{domain}", self.name)
+		match &self.name {
+			Some(name) => format!("_atproto.{name}.{domain}"),
+			None => format!("_atproto.{domain}"),
+		}
+	}
+
+	/// The label fragment this handle's record composes under, ie the `pete` in
+	/// `beetmash-com--atproto-pete`, or [`APEX_LABEL`](Self::APEX_LABEL).
+	pub fn label(&self) -> &str {
+		self.name.as_deref().unwrap_or(Self::APEX_LABEL)
 	}
 
 	/// The record value, ie `did=did:plc:...`. The `did=` is the spec's, not
@@ -59,18 +101,25 @@ impl AtprotoHandle {
 	/// Reject a handle that cannot resolve: a name that is not a legal DNS
 	/// label or is one of the [`RESERVED_HOSTNAMES`](DnsProvider::RESERVED_HOSTNAMES)
 	/// the stack itself needs, or a did that is not one.
+	///
+	/// An apex handle has no name, so neither name check applies to it: both
+	/// constrain a label taken under the domain, and the apex takes none.
 	pub fn validate(&self) -> Result {
-		DnsProvider::validate_label(&self.name, "handle name")?;
-		if DnsProvider::RESERVED_HOSTNAMES.contains(&self.name.as_str()) {
-			bevybail!(
-				"handle name '{}' is a reserved hostname: handles share the zone with infrastructure names",
-				self.name
-			);
+		if let Some(name) = &self.name {
+			DnsProvider::validate_label(name, "handle name")?;
+			if DnsProvider::RESERVED_HOSTNAMES.contains(&name.as_str()) {
+				bevybail!(
+					"handle name '{name}' is a reserved hostname: handles share the zone with infrastructure names"
+				);
+			}
 		}
 		if !self.did.starts_with(Self::DID_PREFIX) {
 			bevybail!(
-				"the did of handle '{}' is '{}', which is not a did: a handle resolves to an identity like `did:plc:...`, not to a handle or a url",
-				self.name,
+				"the did of the {} handle is '{}', which is not a did: a handle resolves to an identity like `did:plc:...`, not to a handle or a url",
+				match &self.name {
+					Some(name) => format!("'{name}'"),
+					None => "apex".to_string(),
+				},
 				self.did
 			);
 		}

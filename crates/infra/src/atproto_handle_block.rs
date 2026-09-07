@@ -5,10 +5,11 @@ use beet::prelude::*;
 /// `beetmash.com` behind `pete.beetmash.com`.
 ///
 /// The whole of a custom-domain handle's infrastructure is one DNS TXT record
-/// per handle, `_atproto.<name>.<domain>` holding `did=did:plc:...`. The
-/// account itself lives on somebody's PDS and is not declared here: this block
-/// publishes the record that points a name people can read at the identity that
-/// already exists.
+/// per handle, `_atproto.<name>.<domain>` holding `did=did:plc:...`, or
+/// `_atproto.<domain>` for the apex handle, which takes no name because it IS
+/// the domain. The account itself lives on somebody's PDS and is not declared
+/// here: this block publishes the record that points a name people can read at
+/// the identity that already exists.
 ///
 /// A zone is owned by one entry (see `ZoneAudit`), so a handle domain that is
 /// also a mail domain declares this tag inside THAT stack rather than in a
@@ -57,7 +58,8 @@ impl Default for AtprotoHandleBlock {
 
 impl AtprotoHandleBlock {
 	/// The resource-label prefix every handle record composes under, ie the
-	/// `atproto-pete` behind `beetmash-com--atproto-pete`.
+	/// `atproto-pete` behind `beetmash-com--atproto-pete`, or the
+	/// `atproto-apex` an apex handle takes in place of the name it has none of.
 	pub const RECORD_LABEL: &'static str = "atproto";
 
 	/// A handle domain with no handles declared yet.
@@ -110,16 +112,24 @@ impl AtprotoHandleBlock {
 	/// record exists.
 	pub fn validate(&self) -> Result {
 		DnsProvider::validate_label(&self.slug(), "handle domain")?;
-		let mut seen = HashSet::<SmolStr>::default();
+		let mut seen = HashSet::<Option<SmolStr>>::default();
 		for handle in &self.handles {
 			handle.validate()?;
 			if !seen.insert(handle.name().clone()) {
-				bevybail!(
-					"handle '{}' is declared twice on '{}': two records at one \
-					 name is a handle that resolves to neither",
-					handle.name(),
-					self.domain
-				);
+				match handle.name() {
+					Some(name) => bevybail!(
+						"handle '{name}' is declared twice on '{}': two records \
+						 at one name is a handle that resolves to neither",
+						self.domain
+					),
+					// the apex has no name to quote, and an empty '' in the
+					// message above would read as a handle with a blank label
+					None => bevybail!(
+						"the apex handle of '{}' is declared twice: two records \
+						 at one name is a handle that resolves to neither",
+						self.domain
+					),
+				}
 			}
 		}
 		Ok(())
@@ -172,7 +182,7 @@ impl EmitBlock for AtprotoHandleBlock {
 				&self.label(&format!(
 					"{}-{}",
 					Self::RECORD_LABEL,
-					handle.name()
+					handle.label()
 				)),
 				&handle.record_name(&self.domain),
 				&handle.record_value(),
@@ -205,6 +215,28 @@ mod test {
 		stack: Stack,
 		blocks: &[AtprotoHandleBlock],
 	) -> Vec<(String, String)> {
+		rendered(stack, blocks)
+			.into_iter()
+			.map(|(_, name, content)| (name, content))
+			.collect()
+	}
+
+	/// The terraform labels every record `blocks` render to, sorted. A label is
+	/// the resource's identity in state, so a wrong one is a record replaced on
+	/// the next apply rather than one that never existed.
+	fn labels(stack: Stack, blocks: &[AtprotoHandleBlock]) -> Vec<String> {
+		rendered(stack, blocks)
+			.into_iter()
+			.map(|(label, _, _)| label)
+			.collect()
+	}
+
+	/// The `(label, name, content)` of every record `blocks` render to under
+	/// `stack`, sorted by name.
+	fn rendered(
+		stack: Stack,
+		blocks: &[AtprotoHandleBlock],
+	) -> Vec<(String, String, String)> {
 		let blocks = blocks.to_vec();
 		let mut world = AtprotoInfraPlugin.into_world();
 		world.init_resource::<PackageConfig>();
@@ -230,8 +262,8 @@ mod test {
 			return Vec::new();
 		};
 		let mut records = records
-			.values()
-			.map(|record| {
+			.iter()
+			.map(|(label, record)| {
 				let field = |key: &str| {
 					record
 						.get(key)
@@ -239,10 +271,10 @@ mod test {
 						.unwrap_or_default()
 						.to_string()
 				};
-				(field("name"), field("content"))
+				(label.clone(), field("name"), field("content"))
 			})
 			.collect::<Vec<_>>();
-		records.sort();
+		records.sort_by(|a, b| a.1.cmp(&b.1));
 		records
 	}
 
@@ -261,6 +293,83 @@ mod test {
 				"did=did:plc:bob".to_string(),
 			),
 		]);
+	}
+
+	/// The apex handle is the domain itself, so the ONE thing that changes is
+	/// the name: still `_atproto.`-prefixed, but with no label between the
+	/// prefix and the domain. `_atproto..example.com` (the naive format) is not
+	/// a name at all, and `example.com` (dropping the prefix) would be a TXT at
+	/// the apex, which is the record every zone's apex-safety rule is about.
+	#[beet::test]
+	fn the_apex_handle_is_the_domain() {
+		let block = AtprotoHandleBlock::new("example.com")
+			.with_dns(DnsProvider::cloudflare("example.com", "zone123"))
+			.with_handle(AtprotoHandle::apex("did:plc:company"));
+		records(Stack::new("atproto"), &[block.clone()]).xpect_eq(vec![(
+			"_atproto.example.com".to_string(),
+			"did=did:plc:company".to_string(),
+		)]);
+		// ..and the handle the probe resolves is the bare domain, not a
+		// `.example.com` with an empty label in front of it
+		block.handles()[0]
+			.handle("example.com")
+			.xpect_eq("example.com");
+	}
+
+	/// The apex and a subdomain are two independent names, so they coexist:
+	/// distinct records, and distinct terraform labels. The label matters
+	/// because it is the resource's identity in state, and the apex has no name
+	/// to compose one from: a naive format leaves a trailing hyphen, so the
+	/// sentinel is written out here.
+	#[beet::test]
+	fn the_apex_coexists_with_a_subdomain() {
+		let block = AtprotoHandleBlock::new("example.com")
+			.with_dns(DnsProvider::cloudflare("example.com", "zone123"))
+			.with_handle(AtprotoHandle::apex("did:plc:company"))
+			.with_handle(AtprotoHandle::new("pete", "did:plc:pete"));
+		records(Stack::new("atproto"), &[block.clone()]).xpect_eq(vec![
+			(
+				"_atproto.example.com".to_string(),
+				"did=did:plc:company".to_string(),
+			),
+			(
+				"_atproto.pete.example.com".to_string(),
+				"did=did:plc:pete".to_string(),
+			),
+		]);
+		// pinned whole, since the sanitiser folds the declared `atproto-apex`
+		// to `atproto_apex` and a trailing-hyphen label would fold to a
+		// trailing underscore rather than fail
+		labels(Stack::new("atproto"), &[block]).xpect_eq(vec![
+			"atproto__dev__example_com_atproto_apex".to_string(),
+			"atproto__dev__example_com_atproto_pete".to_string(),
+		]);
+	}
+
+	/// `apex` is a real DNS label as well as the sentinel an apex handle's
+	/// terraform label composes from, so declaring both is two DIFFERENT
+	/// records (`_atproto.example.com` and `_atproto.apex.example.com`) at one
+	/// terraform label. The config rejects that rather than letting one replace
+	/// the other in state.
+	#[beet::test]
+	fn a_handle_named_apex_collides_with_the_apex() {
+		AtprotoHandleBlock::new("example.com")
+			.with_dns(DnsProvider::cloudflare("example.com", "zone123"))
+			.with_handle(AtprotoHandle::apex("did:plc:company"))
+			.with_handle(AtprotoHandle::new(
+				AtprotoHandle::APEX_LABEL,
+				"did:plc:someoneelse",
+			))
+			.emit(
+				&Stack::new("atproto").resolve(&PackageConfig::default()),
+				&Deployment::default(),
+				&mut Deployment::default().create_config(
+					&Stack::new("atproto").resolve(&PackageConfig::default()),
+				),
+			)
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("duplicate resource");
 	}
 
 	/// A handle record is a real global name: two stages publishing the same
@@ -309,6 +418,20 @@ mod test {
 			.unwrap_err()
 			.to_string()
 			.xpect_contains("declared twice");
+		// the apex has no name, so the two name checks do not apply to it, but
+		// the did check and the duplicate check both still do
+		handle(AtprotoHandle::apex("did:plc:company")).unwrap();
+		handle(AtprotoHandle::apex("company.bsky.social"))
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("not a did");
+		block()
+			.with_handle(AtprotoHandle::apex("did:plc:company"))
+			.with_handle(AtprotoHandle::apex("did:plc:someoneelse"))
+			.validate()
+			.unwrap_err()
+			.to_string()
+			.xpect_contains("apex handle of 'example.com' is declared twice");
 	}
 
 	/// A domain that declares handles but resolves no zone would apply clean

@@ -21,8 +21,9 @@ impl Plugin for AtprotoInfraPlugin {
 
 		// the handle domain and the handles it publishes, spawned by tag:
 		// `<AtprotoHandleBlock domain="beetmash.com"
-		// handles={[{name:"pete", did:"did:plc:.."}]}/>`. Definitions, so every
-		// target: a wasm consumer authors the stack it cannot apply.
+		// handles={[{name:"pete", did:"did:plc:.."}]}/>`, a `name`-less entry
+		// being the apex. Definitions, so every target: a wasm consumer authors
+		// the stack it cannot apply.
 		app.register_type::<AtprotoHandleBlock>()
 			.register_type::<AtprotoHandle>()
 			.add_systems(
@@ -85,6 +86,7 @@ mod test {
 			r#"<Fragment>
 				<AtprotoHandleBlock domain="example.com" dns_stage="prod"
 					handles={[
+						{did:"did:plc:company"},
 						{name:"alice", did:"did:plc:alice"},
 						{name:"bob", did:"did:plc:bob"},
 					]}/>
@@ -94,7 +96,14 @@ mod test {
 		let block =
 			world.query::<&AtprotoHandleBlock>().single(&world).unwrap();
 		block.domain().as_str().xpect_eq("example.com");
-		block.handles()[1].did().as_str().xpect_eq("did:plc:bob");
+		block.handles()[2].did().as_str().xpect_eq("did:plc:bob");
+		// an omitted `name` is the apex, so the literal must complete over the
+		// handle's `Default` rather than dropping the entry: a lost handle here
+		// is a record that never publishes under a deploy that reports green
+		block.handles()[0].name().xpect_none();
+		block.handles()[0]
+			.handle("example.com")
+			.xpect_eq("example.com");
 		block.validate().unwrap();
 		// the stage guard is a field like any other, so a declaration that omits
 		// it publishes and one that names another stage does not
