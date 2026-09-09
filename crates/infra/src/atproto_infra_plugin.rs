@@ -38,8 +38,7 @@ impl Plugin for AtprotoInfraPlugin {
 
 		// the post-apply verb, an unauthenticated http read like any other, so
 		// it registers on every target beside the definitions.
-		app.register_type::<AtprotoHandleProbe>()
-			.register_type::<AtprotoHandleProbeAction>();
+		app.register_type::<AtprotoHandleProbe>();
 	}
 }
 
@@ -123,13 +122,13 @@ mod test {
 			.label
 			.as_str()
 			.xpect_eq("example.com");
-		// the probe is a component + its action, both registered
+		// the probe is one type carrying its own config, resolving the public
+		// AppView unless a declaration names another
 		world
-			.query::<(&AtprotoHandleProbe, &AtprotoHandleProbeAction)>()
+			.query::<&AtprotoHandleProbe>()
 			.single(&world)
 			.unwrap()
-			.0
-			.appview()
+			.appview
 			.as_str()
 			.xpect_eq(PUBLIC_APPVIEW);
 	}

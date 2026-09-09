@@ -91,7 +91,7 @@ pub fn xrpc_error(
 /// matching [`FeedDef`] entity beneath it, and calls its
 /// `Action<FeedQuery, FeedSkeleton>`. Caller auth is not checked, matching the
 /// reference implementation's behavior for feeds that are not user specific.
-#[action(handler_only, route = "xrpc/app.bsky.feed.getFeedSkeleton")]
+#[action(route = "xrpc/app.bsky.feed.getFeedSkeleton")]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub async fn GetFeedSkeleton(cx: ActionContext<RequestParts>) -> Result<Response> {
@@ -176,7 +176,7 @@ pub async fn GetFeedSkeleton(cx: ActionContext<RequestParts>) -> Result<Response
 /// `GET /xrpc/app.bsky.feed.describeFeedGenerator`
 ///
 /// Lists every [`FeedDef`] under this generator as its declaration uri.
-#[action(handler_only, route = "xrpc/app.bsky.feed.describeFeedGenerator")]
+#[action(route = "xrpc/app.bsky.feed.describeFeedGenerator")]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub fn DescribeFeedGenerator(
@@ -211,7 +211,7 @@ pub fn DescribeFeedGenerator(
 ///
 /// The did:web document pointing the network at this service, or 404 when the
 /// service did does not end with the configured hostname (reference parity).
-#[action(handler_only, route = ".well-known/did.json")]
+#[action(route = ".well-known/did.json")]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub fn WellKnownDid(
@@ -234,7 +234,7 @@ pub fn WellKnownDid(
 }
 
 /// `GET /xrpc/_health`, the conventional feed generator liveness probe.
-#[action(handler_only, route = "xrpc/_health")]
+#[action(route = "xrpc/_health")]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
 pub fn XrpcHealth(_cx: In<ActionContext<RequestParts>>) -> Result<Response> {

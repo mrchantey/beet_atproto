@@ -140,7 +140,7 @@ fn setup(mut commands: Commands) -> Result {
 
 /// Publishes the whats-alf declaration record to your PDS, making the feed
 /// appear in the Bluesky app. See the example header for the full command.
-#[action(handler_only)]
+#[action]
 #[derive(Default, Clone, Component, Reflect)]
 #[reflect(Component)]
 async fn Publish(cx: ActionContext<Request>) -> Result<Response> {

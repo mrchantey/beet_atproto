@@ -77,9 +77,24 @@ so it can be authored wherever the zone's owner is.
 	<!-- no region: the only resources here are dns records in a Cloudflare zone,
 	     so nothing composes an AWS name and nothing is deployed into a region. -->
 	<Stack app_name="atproto-handles">
-		<!-- the standard IaC verbs (validate / plan / apply / ... / destroy),
-		     resolving this <Stack> by ancestry. -->
-		<DeployRoutes/>
+		<!-- 💡 what a deploy DOES, as an ordered group rather than a route, and
+		     what a teardown does, authored in the same CONVERGENCE order and run
+		     backwards. This stack owns nothing outside terraform, so its
+		     teardown is `tofu destroy` plus the state carriers a deploy needed
+		     before it. -->
+		<Group bx:ref="deploy_up">
+			<TofuApply/>
+			<AtprotoHandleProbe/>
+		</Group>
+		<Group bx:ref="deploy_down">
+			<StackTeardown/>
+			<TofuDestroy/>
+		</Group>
+
+		<!-- the standard IaC verbs (deploy / destroy / validate / plan / ... ),
+		     resolving this <Stack> by ancestry and running the two groups
+		     above. -->
+		<DeployRoutes deploy={$deploy_up} destroy={$deploy_down}/>
 
 		<!-- 💡 the whole declaration. One TXT record per handle, at
 		     `_atproto.<name>.<domain>`, holding `did=<did>`.
@@ -108,10 +123,6 @@ so it can be authored wherever the zone's owner is.
 				{name:"alice", did:"did:plc:REPLACE-ME-WITH-A-REAL-DID"},
 			]}/>
 
-		<Route path="deploy" {ExchangeSequence}>
-			<TofuApply/>
-			<AtprotoHandleProbe/>
-		</Route>
 
 		<!-- the probe on its own: cheap, read-only and the honest answer to "is
 		     the handle still wired up", which nothing about a converged record

@@ -14,37 +14,19 @@ use beet_atproto_client::prelude::*;
 /// marked invalid in the app.
 ///
 /// Read-only and unauthenticated: it asks Bluesky's own resolver exactly what a
-/// client asks, which is the only answer worth asserting.
-#[derive(Debug, Clone, Get, SetWith, Component, Reflect)]
+/// client asks, which is the only answer worth asserting. Resolves each declared
+/// handle in turn, failing on the first that does not answer with its declared
+/// did.
+#[action]
+#[derive(Debug, Component, Reflect)]
 #[reflect(Component, Default)]
-#[require(AtprotoHandleProbeAction)]
-pub struct AtprotoHandleProbe {
+pub async fn AtprotoHandleProbe(
 	/// The AppView the handles are resolved through, ie a self-hosted instance.
 	/// Defaults to the public one, which is the resolver the app itself uses.
+	#[field(default = SmolStr::new_static(PUBLIC_APPVIEW))]
 	appview: SmolStr,
-}
-
-impl Default for AtprotoHandleProbe {
-	fn default() -> Self {
-		Self {
-			appview: PUBLIC_APPVIEW.into(),
-		}
-	}
-}
-
-/// Resolves each declared handle in turn, failing on the first that does not
-/// answer with its declared did.
-#[action(handler_only)]
-#[derive(Default, Component, Reflect)]
-#[reflect(Component, Default)]
-pub async fn AtprotoHandleProbeAction(
 	cx: ActionContext<Request>,
 ) -> Result<Outcome<Request, Response>> {
-	let probe = cx
-		.caller
-		.get_cloned::<AtprotoHandleProbe>()
-		.await
-		.unwrap_or_default();
 	let declared = cx
 		.caller
 		.with_world(AtprotoHandleQuery::published)
@@ -64,7 +46,7 @@ pub async fn AtprotoHandleProbeAction(
 		);
 	}
 
-	let appview = AppView::new(probe.appview().to_string());
+	let appview = AppView::new(appview.to_string());
 	for (handle, did) in declared.iter() {
 		let resolved = appview.resolve_handle(handle).await.map_err(|err| {
 			bevyhow!(
