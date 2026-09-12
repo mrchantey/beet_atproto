@@ -1,15 +1,29 @@
 # beet_atproto workflows.
 
+# `rustfmt.toml` uses nightly-only options, so formatting needs a nightly
+# toolchain. Pinned to match `../beet` so both trees format identically;
+# bump the two together.
+fmt-toolchain := 'nightly-2026-07-02'
+
 # List recipes.
 default:
 	@just --list
 
-# This workspace's beet cli: the stock runner plus `AtprotoInfraPlugin`, so an
-# entry declaring `<AtprotoHandleBlock/>` resolves it.
-#
 #     just cli --main=examples/infra/custom_handle_domain.bsx validate
+#
+# This workspace's beet cli: the stock runner plus `AtprotoInfraPlugin`, so an entry declaring `<AtprotoHandleBlock/>` resolves it.
 cli *args:
 	cargo run --features=cli -- {{args}}
+
+# Format every workspace member with the pinned nightly. Never `cargo fmt`.
+fmt *args:
+	#!/usr/bin/env bash
+	set -euo pipefail
+	# bare `cargo fmt` on stable silently drops every nightly-only option in
+	# `rustfmt.toml`, reformatting the whole tree into a huge bogus diff.
+	rustup toolchain list | grep -q '^{{ fmt-toolchain }}' \
+		|| rustup toolchain install {{ fmt-toolchain }} --profile minimal --component rustfmt
+	cargo +{{ fmt-toolchain }} fmt --all {{ args }}
 
 # Native tests for the four crates (the beet harness; pass `--snap` to update snapshots).
 test *args:
