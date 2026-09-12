@@ -132,7 +132,10 @@ fn setup(mut commands: Commands) -> Result {
 			.get("endpoint")
 			.map(|endpoint| Jetstream::new(endpoint.as_str()))
 			.unwrap_or_default();
-		info!("ingesting posts containing '{filter}' from {}", jetstream.endpoint);
+		info!(
+			"ingesting posts containing '{filter}' from {}",
+			jetstream.endpoint
+		);
 		commands.spawn(jetstream);
 	}
 	Ok(())

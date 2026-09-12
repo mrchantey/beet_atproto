@@ -76,7 +76,8 @@ use beet::prelude::*;
 use beet_atproto::prelude::*;
 
 /// The feed served by `examples/feed_generator.rs` with its default publisher.
-const DEFAULT_FEED: &str = "at://did:example:alice/app.bsky.feed.generator/whats-alf";
+const DEFAULT_FEED: &str =
+	"at://did:example:alice/app.bsky.feed.generator/whats-alf";
 /// Bluesky's own `whats-hot`, stood in for the generator when it is not up.
 /// Published, so the AppView serves it hydrated and the client needs no local
 /// service at all.
@@ -245,7 +246,8 @@ async fn follow_feed(entity: AsyncEntity) -> Result {
 	// rather than after an idle poll interval
 	let mut switched = false;
 	loop {
-		let status = match fetch_new_posts(&reader, &source, &mut follow).await {
+		let status = match fetch_new_posts(&reader, &source, &mut follow).await
+		{
 			// connected, but a feed with no matching post yet looks identical to
 			// a broken one on screen, so the two are spelled out differently
 			Ok(posts) => match append_posts(&entity, posts).await? {
@@ -254,7 +256,9 @@ async fn follow_feed(entity: AsyncEntity) -> Result {
 					 ingesting, and is its --filter common enough?",
 					source.label()
 				),
-				total => format!("following {} · {total} posts", source.label()),
+				total => {
+					format!("following {} · {total} posts", source.label())
+				}
 			},
 			Err(err) => {
 				warn!("feed fetch failed: {err}");
@@ -264,7 +268,10 @@ async fn follow_feed(entity: AsyncEntity) -> Result {
 					Some(feed) => {
 						source = FeedSource::AppViewFeed { feed };
 						switched = true;
-						info!("generator unreachable, falling back to {}", source.label());
+						info!(
+							"generator unreachable, falling back to {}",
+							source.label()
+						);
 						format!(
 							"no generator at {}, reading {} instead. Pass --feed to \
 							 insist on a generator.",
@@ -329,7 +336,8 @@ async fn fetch_new_posts(
 			reader.appview.get_posts(&uris).await
 		}
 		FeedSource::AppViewFeed { feed } => {
-			let page = reader.appview.get_feed(feed, reader.limit, None).await?;
+			let page =
+				reader.appview.get_feed(feed, reader.limit, None).await?;
 			// already hydrated, so dedup keeps the post beside its uri
 			let unseen = follow
 				.unseen(page.feed.iter().map(|item| item.post.uri.clone()))
@@ -391,13 +399,19 @@ async fn append_posts(
 
 /// The window's actor for this account, minted on first sight. Actors are keyed
 /// by did rather than handle, the only account identity that never changes.
-fn resolve_actor(window: &mut ThreadWindow, author: &ProfileViewBasic) -> ActorId {
+fn resolve_actor(
+	window: &mut ThreadWindow,
+	author: &ProfileViewBasic,
+) -> ActorId {
 	window
 		.actors()
 		.iter()
 		.find(|(_, actor)| {
-			actor.metadata().get("did").and_then(|did| did.as_str()).ok()
-				== Some(author.did.as_str())
+			actor
+				.metadata()
+				.get("did")
+				.and_then(|did| did.as_str())
+				.ok() == Some(author.did.as_str())
 		})
 		.map(|(id, _)| *id)
 		.unwrap_or_else(|| {
@@ -412,13 +426,10 @@ fn resolve_actor(window: &mut ThreadWindow, author: &ProfileViewBasic) -> ActorI
 // ╚═══════════════════════════════════════════╝
 
 fn routes() -> impl Bundle {
-	(
-		Layout::of::<FeedLayout>(),
-		children![
-			render_action::async_route("", feed_page),
-			render_action::system_route("live", live_page)
-		],
-	)
+	(Layout::of::<FeedLayout>(), children![
+		render_action::async_route("", feed_page),
+		render_action::system_route("live", live_page)
+	])
 }
 
 /// The document layout wrapping both pages. The `<head>` is non-visual, so the
@@ -591,13 +602,10 @@ fn live_column() -> OnSpawn {
 
 /// One post block, spaced off its neighbours.
 fn row_block() -> OnSpawn {
-	inline_class![(
-		common_props::MarginProp,
-		style::Spacing {
-			bottom: Length::Rem(1.),
-			..default()
-		}
-	)]
+	inline_class![(common_props::MarginProp, style::Spacing {
+		bottom: Length::Rem(1.),
+		..default()
+	})]
 }
 
 /// The author line, the post's loudest field.

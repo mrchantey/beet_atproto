@@ -160,12 +160,18 @@ mod test {
 		)
 		.with_description("posts about alf")
 		.record_json("2024-09-09T19:46:02.102Z");
-		record["$type"].as_str().unwrap().xpect_eq(FEED_GENERATOR_NSID);
+		record["$type"]
+			.as_str()
+			.unwrap()
+			.xpect_eq(FEED_GENERATOR_NSID);
 		record["did"]
 			.as_str()
 			.unwrap()
 			.xpect_eq("did:web:feed.example.com");
-		record["displayName"].as_str().unwrap().xpect_eq("What's Alf");
+		record["displayName"]
+			.as_str()
+			.unwrap()
+			.xpect_eq("What's Alf");
 		record["description"]
 			.as_str()
 			.unwrap()

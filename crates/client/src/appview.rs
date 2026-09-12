@@ -38,7 +38,10 @@ impl AppView {
 	/// Uris are chunked to [`MAX_GET_POSTS_URIS`] per call. Deleted and
 	/// otherwise missing posts are omitted by the AppView, so the result may be
 	/// shorter than the request.
-	pub async fn get_posts(&self, uris: &[SmolStr]) -> Result<Vec<AppViewPost>> {
+	pub async fn get_posts(
+		&self,
+		uris: &[SmolStr],
+	) -> Result<Vec<AppViewPost>> {
 		let mut posts = Vec::with_capacity(uris.len());
 		for chunk in uris.chunks(MAX_GET_POSTS_URIS) {
 			posts.extend(
@@ -130,7 +133,10 @@ impl AppView {
 	}
 
 	/// Restore the requested order, dropping uris the AppView did not return.
-	fn order_posts(uris: &[SmolStr], posts: Vec<AppViewPost>) -> Vec<AppViewPost> {
+	fn order_posts(
+		uris: &[SmolStr],
+		posts: Vec<AppViewPost>,
+	) -> Vec<AppViewPost> {
 		let mut by_uri = posts
 			.into_iter()
 			.map(|post| (post.uri.clone(), post))
@@ -307,7 +313,8 @@ mod test {
 
 	#[beet::test]
 	fn deserializes_minimal_post_view() {
-		let post = serde_json::from_str::<AppViewPost>(MINIMAL_POST_VIEW).unwrap();
+		let post =
+			serde_json::from_str::<AppViewPost>(MINIMAL_POST_VIEW).unwrap();
 		post.like_count.xpect_eq(0);
 		post.record.text.xpect_eq("");
 		// no display name falls back to the handle
@@ -322,7 +329,11 @@ mod test {
 		))
 		.unwrap();
 		page.cursor.unwrap().xpect_eq("1725911162329308");
-		page.feed[0].post.author.handle.xpect_eq("alice.bsky.social");
+		page.feed[0]
+			.post
+			.author
+			.handle
+			.xpect_eq("alice.bsky.social");
 		// the end of a feed omits the cursor
 		serde_json::from_str::<GetFeedResponse>(r#"{ "feed": [] }"#)
 			.unwrap()
@@ -382,9 +393,10 @@ mod test {
 	fn orders_posts_and_drops_missing() {
 		let uris = ["at://a".into(), "at://b".into(), "at://c".into()];
 		// the appview answered out of order, and dropped the deleted `b`
-		AppView::order_posts(&uris, vec![post_view("at://c"), post_view(
-			"at://a",
-		)])
+		AppView::order_posts(&uris, vec![
+			post_view("at://c"),
+			post_view("at://a"),
+		])
 		.iter()
 		.map(|post| post.uri.as_str())
 		.collect::<Vec<_>>()
@@ -395,21 +407,16 @@ mod test {
 	fn follows_only_the_new_tail() {
 		let mut follow = FeedFollow::default();
 		// a newest-first page comes back oldest-first, ready to append
-		follow
-			.unseen(["at://c", "at://b", "at://a"])
-			.xpect_eq(vec![
-				SmolStr::from("at://a"),
-				"at://b".into(),
-				"at://c".into(),
-			]);
+		follow.unseen(["at://c", "at://b", "at://a"]).xpect_eq(vec![
+			SmolStr::from("at://a"),
+			"at://b".into(),
+			"at://c".into(),
+		]);
 		// the next poll overlaps: only the two new heads survive
 		follow
 			.unseen(["at://e", "at://d", "at://c", "at://b"])
 			.xpect_eq(vec![SmolStr::from("at://d"), "at://e".into()]);
 		// a poll with nothing new appends nothing
-		follow
-			.unseen(["at://e", "at://d"])
-			.is_empty()
-			.xpect_true();
+		follow.unseen(["at://e", "at://d"]).is_empty().xpect_true();
 	}
 }

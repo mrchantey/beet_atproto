@@ -94,7 +94,9 @@ pub fn xrpc_error(
 #[action(route = "xrpc/app.bsky.feed.getFeedSkeleton")]
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component, Default)]
-pub async fn GetFeedSkeleton(cx: ActionContext<RequestParts>) -> Result<Response> {
+pub async fn GetFeedSkeleton(
+	cx: ActionContext<RequestParts>,
+) -> Result<Response> {
 	let world = cx.world();
 	let caller = cx.caller.clone();
 	let parts = cx.take();
@@ -246,8 +248,8 @@ pub fn XrpcHealth(_cx: In<ActionContext<RequestParts>>) -> Result<Response> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet::prelude::*;
 	use beet::exports::bevy::ecs::system::RunSystemOnce;
+	use beet::prelude::*;
 
 	const FEED_URI: &str =
 		"at://did:plc:publisher/app.bsky.feed.generator/whats-alf";
@@ -271,11 +273,9 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world.spawn(test_tree()).flush();
 		let feed = world
-			.run_system_once(
-				|query: Query<Entity, With<FeedDef>>| -> Entity {
-					query.single().unwrap()
-				},
-			)
+			.run_system_once(|query: Query<Entity, With<FeedDef>>| -> Entity {
+				query.single().unwrap()
+			})
 			.unwrap();
 		let mut index = world.get_mut::<PostIndex>(feed).unwrap();
 		for (rkey, cid, time) in

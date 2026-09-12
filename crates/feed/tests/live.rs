@@ -16,11 +16,11 @@ async fn jetstream_receives_live() {
 	app.add_plugins((MinimalPlugins, AsyncPlugin));
 	let events = Store::<Vec<JetstreamEvent>>::default();
 	let observed = events.clone();
-	app.world_mut()
-		.spawn(Jetstream::default())
-		.observe_any(move |ev: On<JetstreamRecv>| {
+	app.world_mut().spawn(Jetstream::default()).observe_any(
+		move |ev: On<JetstreamRecv>| {
 			observed.push(ev.event().0.clone());
-		});
+		},
+	);
 	app_ext::update_until_timeout(
 		&mut app,
 		move |_| !events.is_empty(),

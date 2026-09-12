@@ -86,10 +86,9 @@ mod test {
 
 	#[beet::test]
 	fn parses() {
-		let uri = AtUri::parse(
-			"at://did:plc:abc/app.bsky.feed.generator/whats-alf",
-		)
-		.unwrap();
+		let uri =
+			AtUri::parse("at://did:plc:abc/app.bsky.feed.generator/whats-alf")
+				.unwrap();
 		uri.authority.xpect_eq("did:plc:abc");
 		uri.collection.xpect_eq(FEED_GENERATOR_NSID);
 		uri.rkey.xpect_eq("whats-alf");

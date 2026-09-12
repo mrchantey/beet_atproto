@@ -145,7 +145,8 @@ pub(crate) mod test {
 
 	#[beet::test]
 	fn deserializes_like_create() {
-		let event = serde_json::from_str::<JetstreamEvent>(LIKE_CREATE).unwrap();
+		let event =
+			serde_json::from_str::<JetstreamEvent>(LIKE_CREATE).unwrap();
 		event.did.xpect_eq("did:plc:eygmaihciaxprqvxpfvl6flk");
 		event.time_us.xpect_eq(1725911162329308_u64);
 		event.kind.xpect_eq("commit");
@@ -155,23 +156,20 @@ pub(crate) mod test {
 		commit.collection.xpect_eq("app.bsky.feed.like");
 		commit.rkey.xpect_eq("3l3qo2vuowo2b");
 		commit.record.as_ref().xpect_some();
-		commit
-			.cid
-			.as_ref()
-			.unwrap()
-			.xpect_eq("bafyreidwaivazkwu67xztlmuobx35hs2lnfh3kolmgfmucldvhd3sgzcqi");
+		commit.cid.as_ref().unwrap().xpect_eq(
+			"bafyreidwaivazkwu67xztlmuobx35hs2lnfh3kolmgfmucldvhd3sgzcqi",
+		);
 		// likes carry no post record
 		event.post_record().xpect_none();
-		event
-			.at_uri()
-			.unwrap()
-			.to_string()
-			.xpect_eq("at://did:plc:eygmaihciaxprqvxpfvl6flk/app.bsky.feed.like/3l3qo2vuowo2b");
+		event.at_uri().unwrap().to_string().xpect_eq(
+			"at://did:plc:eygmaihciaxprqvxpfvl6flk/app.bsky.feed.like/3l3qo2vuowo2b",
+		);
 	}
 
 	#[beet::test]
 	fn deserializes_post_create() {
-		let event = serde_json::from_str::<JetstreamEvent>(POST_CREATE).unwrap();
+		let event =
+			serde_json::from_str::<JetstreamEvent>(POST_CREATE).unwrap();
 		let post = event.post_record().unwrap();
 		post.text.xpect_eq("have you seen alf lately?");
 		post.created_at.xpect_eq("2024-09-09T19:46:02.102Z");
@@ -184,7 +182,8 @@ pub(crate) mod test {
 
 	#[beet::test]
 	fn deserializes_post_delete() {
-		let event = serde_json::from_str::<JetstreamEvent>(POST_DELETE).unwrap();
+		let event =
+			serde_json::from_str::<JetstreamEvent>(POST_DELETE).unwrap();
 		let commit = event.commit.as_ref().unwrap();
 		commit.operation.xpect_eq(CommitOperation::Delete);
 		commit.record.as_ref().xpect_none();

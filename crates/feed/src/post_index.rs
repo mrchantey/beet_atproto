@@ -189,11 +189,14 @@ mod test {
 
 	#[beet::test]
 	fn filters_text() {
-		let event =
-			serde_json::from_str::<JetstreamEvent>(crate::jetstream_event::test::POST_CREATE)
-				.unwrap();
+		let event = serde_json::from_str::<JetstreamEvent>(
+			crate::jetstream_event::test::POST_CREATE,
+		)
+		.unwrap();
 		let post = event.post_record().unwrap();
-		PostFilter::text_contains("ALF").matches(&event, &post).xpect_true();
+		PostFilter::text_contains("ALF")
+			.matches(&event, &post)
+			.xpect_true();
 		PostFilter::text_contains("wrong")
 			.matches(&event, &post)
 			.xpect_false();

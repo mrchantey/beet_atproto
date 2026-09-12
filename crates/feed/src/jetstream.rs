@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use beet::prelude::*;
 use beet::net::prelude::sockets::Message;
 use beet::net::prelude::sockets::*;
+use beet::prelude::*;
 
 /// A parsed Jetstream event received by this [`Jetstream`] entity.
 #[derive(Debug, Clone, Deref, EntityTargetEvent)]
@@ -109,7 +109,9 @@ async fn connection_loop(entity: AsyncEntity) -> Result {
 						.next()
 						.and_then(|frame| frame.next_attempt)
 						.ok_or_else(|| {
-							bevyhow!("jetstream connect to {url} gave up: {err}")
+							bevyhow!(
+								"jetstream connect to {url} gave up: {err}"
+							)
 						})?;
 					debug!(
 						"jetstream connect to {url} failed ({err}), retrying in {delay:?}"
@@ -213,9 +215,9 @@ mod test {
 	use crate::jetstream_event::test::POST_CREATE;
 	use crate::jetstream_event::test::POST_DELETE;
 	use crate::prelude::*;
-	use beet::prelude::*;
 	use beet::net::prelude::sockets::Message;
 	use beet::net::prelude::sockets::*;
+	use beet::prelude::*;
 
 	#[beet::test]
 	fn builds_subscribe_url() {
