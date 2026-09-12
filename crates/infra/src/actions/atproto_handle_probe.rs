@@ -51,7 +51,9 @@ pub async fn AtprotoHandleProbe(
 		let resolved = appview.resolve_handle(handle).await.map_err(|err| {
 			bevyhow!(
 				"'{handle}' does not resolve: the `_atproto.{handle}` record is \
-				 missing, or the zone has not propagated it yet. {err}"
+				 missing, the zone has not propagated it yet, or the AppView is \
+				 serving a stale failed resolution from before a fix, which it \
+				 keeps for up to an hour: retry later. {err}"
 			)
 		})?;
 		if resolved != *did {

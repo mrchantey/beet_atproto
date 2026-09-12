@@ -54,6 +54,14 @@ Remove the handle from the declaration and re-run `deploy`; the record retires
 with it. Switch the account back to a `*.bsky.social` handle in the app FIRST,
 or its sessions keep working while its handle displays as invalid.
 
+## Verification
+
+Bluesky's resolvers cache a FAILED resolution too, per replica and for up to an
+hour, long past the record's TTL. So a claim attempted before the record was
+right keeps failing with "Failed to verify handle" after the record is fixed,
+while `dig` and the probe already agree. Wait it out rather than redeploying:
+nothing on this side is stale.
+
 ## One entry owns a zone
 
 `<ZoneAudit/>` asserts that its own stack's declarations are exactly what the
