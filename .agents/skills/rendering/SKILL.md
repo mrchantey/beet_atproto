@@ -5,7 +5,7 @@ description: Iterate on the beet rendering pipeline, which renders target-agnost
 
 # Iterating on Beet Rendering
 
-Pages are authored once as target-agnostic scenes and rendered to two targets: the web (HTML + CSS) and the terminal (charcell ANSI). This skill is how to change them and get it right. System reference: `rendering-system.md`. Charcell internals + true terminal width: `charcell.md`. Screenshots: `webdriver.md`. No-code (markup) sites + matching a compiled reference for parity: `no-code-sites.md`. Live reference (previous, web-only site): `.agents/references/beet_old`.
+Pages are authored once as target-agnostic scenes and rendered to three sinks: the web (HTML + CSS, and in the browser the live DOM the same world patches in place) and the terminal (charcell ANSI). This skill is how to change them and get it right. System reference: `rendering-system.md`. Charcell internals + true terminal width: `charcell.md`. Screenshots: `webdriver.md`. No-code (markup) sites + matching a compiled reference for parity: `no-code-sites.md`. Live reference (previous, web-only site): `.agents/references/beet_old`.
 
 ## Attitude
 
@@ -33,7 +33,7 @@ A throwaway harness beats re-rendering the whole site. Build the *real* widget i
 - **Charcell:** spawn the scene in a `(scene plugins, CharcellPlugin, MaterialStylePlugin)` world, attach a `FlexBuffer`, run the `PostParseTree` schedule, then query every entity's `Element`/`LayoutRect`/`LayoutStyle`/`BoxStyle` and print tag, display, `x..max`, resolved padding. One run shows whether a node is misplaced by its own box or by an inherited/leaked value.
 - **Web:** in `page.evaluate`, `getComputedStyle` + `getBoundingClientRect` over the elements in question; dump width/display/padding/transform. A "134px rail that should be 256px" is one query from the answer (a flex sibling shrinking it).
 
-Promote a harness that earns its keep into a regression test (see `widgets/sidebar.rs` `mod test`).
+Promote a harness that earns its keep into a regression test (see `widgets/chrome/sidebar.rs` `mod test`).
 
 ## Read the generated CSS, not just pixels
 

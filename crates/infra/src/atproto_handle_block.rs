@@ -78,17 +78,18 @@ impl AtprotoHandleBlock {
 		self
 	}
 
-	/// The zone this domain's records are published into: the declared
-	/// [`dns`](Self::with_dns) provider, else a Cloudflare zone read from
-	/// `CLOUDFLARE_ZONE_ID`.
+	/// The provider this domain's records are published through: the
+	/// declared [`dns`](Self::with_dns) provider, else Cloudflare records in
+	/// the stack's `CloudflareZone`, resolved at render from the block's
+	/// ancestry.
 	///
 	/// A declaration says which domain it serves and nothing about where the
 	/// zone lives, exactly as it says nothing about which account it deploys
-	/// into: both are properties of the launch.
-	pub fn resolved_dns(&self) -> Option<DnsProvider> {
+	/// into: both are addresses declared above it.
+	pub fn resolved_dns(&self) -> DnsProvider {
 		self.dns
 			.clone()
-			.or_else(|| DnsProvider::cloudflare_env(self.domain.clone()))
+			.unwrap_or_else(|| DnsProvider::cloudflare(self.domain.clone()))
 	}
 
 	/// Whether this stage may publish these names, ie whether it is the
@@ -168,13 +169,7 @@ impl EmitBlock for AtprotoHandleBlock {
 			);
 			return Ok(());
 		}
-		let dns = self.resolved_dns().ok_or_else(|| {
-			bevyhow!(
-				"handle domain '{}' publishes records but no zone resolves: \
-				 set CLOUDFLARE_ZONE_ID or `with_dns` a provider",
-				self.domain
-			)
-		})?;
+		let dns = self.resolved_dns();
 		for handle in &self.handles {
 			dns.emit_txt(
 				stack,
@@ -199,20 +194,28 @@ mod test {
 	use serde_json::Value;
 
 	/// Two handles on one domain, which is the declaration every assertion
-	/// below reads. The zone is written out so nothing here depends on the
-	/// environment.
+	/// below reads; the zone is the stack's, see [`zoned`].
 	fn block() -> AtprotoHandleBlock {
 		AtprotoHandleBlock::new("example.com")
-			.with_dns(DnsProvider::cloudflare("example.com", "zone123"))
 			.with_handle(AtprotoHandle::new("alice", "did:plc:alice"))
 			.with_handle(AtprotoHandle::new("bob", "did:plc:bob"))
+	}
+
+	/// The zone every record here lands in and the region the stack renders
+	/// against, declared on the stack as an entry declares them on its root.
+	fn zoned(stack: Stack) -> (Stack, AwsRegion, CloudflareZone) {
+		(
+			stack,
+			AwsRegion::new("us-west-2"),
+			CloudflareZone::new("example.com", "zone123"),
+		)
 	}
 
 	/// The `(name, content)` of every record `blocks` render to under `stack`,
 	/// sorted. The one way a test renders, ie through the same schedule the
 	/// deploy runs.
 	fn records(
-		stack: Stack,
+		stack: impl Bundle,
 		blocks: &[AtprotoHandleBlock],
 	) -> Vec<(String, String)> {
 		rendered(stack, blocks)
@@ -224,7 +227,10 @@ mod test {
 	/// The terraform labels every record `blocks` render to, sorted. A label is
 	/// the resource's identity in state, so a wrong one is a record replaced on
 	/// the next apply rather than one that never existed.
-	fn labels(stack: Stack, blocks: &[AtprotoHandleBlock]) -> Vec<String> {
+	fn labels(
+		stack: impl Bundle,
+		blocks: &[AtprotoHandleBlock],
+	) -> Vec<String> {
 		rendered(stack, blocks)
 			.into_iter()
 			.map(|(label, _, _)| label)
@@ -234,7 +240,7 @@ mod test {
 	/// The `(label, name, content)` of every record `blocks` render to under
 	/// `stack`, sorted by name.
 	fn rendered(
-		stack: Stack,
+		stack: impl Bundle,
 		blocks: &[AtprotoHandleBlock],
 	) -> Vec<(String, String, String)> {
 		let blocks = blocks.to_vec();
@@ -283,7 +289,7 @@ mod test {
 	/// record that exists and means nothing.
 	#[beet::test]
 	fn a_handle_is_one_txt_record() {
-		records(Stack::new("atproto"), &[block()]).xpect_eq(vec![
+		records(zoned(Stack::new("atproto")), &[block()]).xpect_eq(vec![
 			(
 				"_atproto.alice.example.com".to_string(),
 				"did=did:plc:alice".to_string(),
@@ -303,12 +309,13 @@ mod test {
 	#[beet::test]
 	fn the_apex_handle_is_the_domain() {
 		let block = AtprotoHandleBlock::new("example.com")
-			.with_dns(DnsProvider::cloudflare("example.com", "zone123"))
 			.with_handle(AtprotoHandle::apex("did:plc:company"));
-		records(Stack::new("atproto"), &[block.clone()]).xpect_eq(vec![(
-			"_atproto.example.com".to_string(),
-			"did=did:plc:company".to_string(),
-		)]);
+		records(zoned(Stack::new("atproto")), &[block.clone()]).xpect_eq(vec![
+			(
+				"_atproto.example.com".to_string(),
+				"did=did:plc:company".to_string(),
+			),
+		]);
 		// ..and the handle the probe resolves is the bare domain, not a
 		// `.example.com` with an empty label in front of it
 		block.handles()[0]
@@ -324,10 +331,9 @@ mod test {
 	#[beet::test]
 	fn the_apex_coexists_with_a_subdomain() {
 		let block = AtprotoHandleBlock::new("example.com")
-			.with_dns(DnsProvider::cloudflare("example.com", "zone123"))
 			.with_handle(AtprotoHandle::apex("did:plc:company"))
 			.with_handle(AtprotoHandle::new("pete", "did:plc:pete"));
-		records(Stack::new("atproto"), &[block.clone()]).xpect_eq(vec![
+		records(zoned(Stack::new("atproto")), &[block.clone()]).xpect_eq(vec![
 			(
 				"_atproto.example.com".to_string(),
 				"did=did:plc:company".to_string(),
@@ -340,7 +346,7 @@ mod test {
 		// pinned whole, since the sanitiser folds the declared `atproto-apex`
 		// to `atproto_apex` and a trailing-hyphen label would fold to a
 		// trailing underscore rather than fail
-		labels(Stack::new("atproto"), &[block]).xpect_eq(vec![
+		labels(zoned(Stack::new("atproto")), &[block]).xpect_eq(vec![
 			"atproto__dev__example_com_atproto_apex".to_string(),
 			"atproto__dev__example_com_atproto_pete".to_string(),
 		]);
@@ -353,19 +359,22 @@ mod test {
 	/// the other in state.
 	#[beet::test]
 	fn a_handle_named_apex_collides_with_the_apex() {
+		let stack = Stack::new("atproto")
+			.resolve(&PackageConfig::default())
+			.with_cloudflare_zone(CloudflareZone::new(
+				"example.com",
+				"zone123",
+			));
 		AtprotoHandleBlock::new("example.com")
-			.with_dns(DnsProvider::cloudflare("example.com", "zone123"))
 			.with_handle(AtprotoHandle::apex("did:plc:company"))
 			.with_handle(AtprotoHandle::new(
 				AtprotoHandle::APEX_LABEL,
 				"did:plc:someoneelse",
 			))
 			.emit(
-				&Stack::new("atproto").resolve(&PackageConfig::default()),
+				&stack,
 				&Deployment::default(),
-				&mut Deployment::default().create_config(
-					&Stack::new("atproto").resolve(&PackageConfig::default()),
-				),
+				&mut Deployment::default().create_config(&stack),
 			)
 			.unwrap_err()
 			.to_string()
@@ -378,10 +387,12 @@ mod test {
 	#[beet::test]
 	fn only_the_owning_stage_publishes() {
 		let block = block().with_dns_stage("prod");
-		records(Stack::new("atproto").with_stage("prod"), &[block.clone()])
-			.len()
-			.xpect_eq(2);
-		records(Stack::new("atproto").with_stage("drill"), &[block])
+		records(zoned(Stack::new("atproto").with_stage("prod")), &[
+			block.clone()
+		])
+		.len()
+		.xpect_eq(2);
+		records(zoned(Stack::new("atproto").with_stage("drill")), &[block])
 			.xpect_eq(Vec::new());
 	}
 
@@ -391,7 +402,6 @@ mod test {
 	fn invalid_declarations_fail_at_config_time() {
 		let handle = |handle: AtprotoHandle| {
 			AtprotoHandleBlock::new("example.com")
-				.with_dns(DnsProvider::cloudflare("example.com", "zone123"))
 				.with_handle(handle)
 				.validate()
 		};
@@ -434,20 +444,12 @@ mod test {
 			.xpect_contains("apex handle of 'example.com' is declared twice");
 	}
 
-	/// A domain that declares handles but resolves no zone would apply clean
-	/// and publish nothing, which is a green deploy and a handle that does not
-	/// exist. A domain declaring no handle at all needs no zone.
-	///
-	/// Native-only: the fallback zone is read from the environment, and wasm has
-	/// no process environment to pin it in.
-	#[cfg(not(target_arch = "wasm32"))]
+	/// A domain that declares handles under a stack with no zone would apply
+	/// clean and publish nothing, which is a green deploy and a handle that
+	/// does not exist: it fails naming the spread instead. A domain declaring
+	/// no handle at all needs no zone.
 	#[beet::test]
 	fn handles_without_a_zone_fail() {
-		// SAFETY: test-only. The empty value is what a machine with no zone
-		// configured resolves, pinned so a configured one cannot pass this.
-		unsafe {
-			std::env::set_var("CLOUDFLARE_ZONE_ID", "");
-		}
 		let stack = Stack::new("atproto").resolve(&PackageConfig::default());
 		let deployment = Deployment::default();
 		let mut config = deployment.create_config(&stack);
@@ -456,12 +458,9 @@ mod test {
 			.emit(&stack, &deployment, &mut config)
 			.unwrap_err()
 			.to_string()
-			.xpect_contains("no zone resolves");
+			.xpect_contains("CloudflareZone");
 		AtprotoHandleBlock::new("example.com")
 			.emit(&stack, &deployment, &mut config)
 			.unwrap();
-		unsafe {
-			std::env::remove_var("CLOUDFLARE_ZONE_ID");
-		}
 	}
 }

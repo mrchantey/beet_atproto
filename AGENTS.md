@@ -41,12 +41,14 @@ Every agent reads this file, so it keeps only what every session needs and stays
 
 Situational cheatsheets, read before touching the subsystem:
 
-- Actions: one-per-entity, overloads, providers, facets: `crates/beet_action/README.md`
+- Actions: one-per-entity, overloads, providers, `#[field]`, facets: `crates/beet_action/README.md`
 - Servers and the lifecycle verbs: `crates/beet_net/README.md`
 - Cloud resources: stacks, grants, buckets, jobs: `crates/beet_infra/README.md` + `.agents/skills/infra-deploy`
-- The beet CLI, entries, wasm binaries: `crates/beet-cli/README.md`
+- The beet CLI, entries, wasm binaries, making any binary a beet runtime: `crates/beet-cli/README.md` + `crates/beet_router/src/launch/mod.rs`
 - Styling: `crates/beet_ui/src/style/mod.rs`
+- Scene editing (tree, inspector, entity and component pickers): `crates/beet_ui/src/widgets/scene_editor/mod.rs`
 - Rendering (web + charcell): `.agents/skills/rendering`
+- Mermaid diagrams (fences, `<Mermaid>`, modes, the Auto rule, the paint tokens): `crates/beet_ui/src/parse/mermaid/mod.rs`
 
 ## Workflow
 
@@ -75,11 +77,25 @@ Never use `.claude/projects/../memory`, all content related to this project must
 ## Conventions
 
 - A rust module reads like a good book: public high level structs at the top, implementation details below. Mod files are just reexports; prefer splitting into specific sub files, but dont 'create a fresh file' because the one you're working on is messy.
-- When responding to the user, use a single numbered sequence, continuing across headings (1, 2 under the first heading, 3, 4 under the next).
+- Respond to the user with a single numbered sequence with strictly one point per number. intersperse with subheadings as required but subheadings do not get numbers. Open questions should have available options listed alphabetically , with a) being selected by default if no answer.
+
+Example
+```md
+## Subheading foo
+1. some info about this point...
+## Subheading bar
+2. some info about another point that needs a decision..
+	- a) do foo
+	- b) do bar
+	- c) do bazz
+3. some more info..
+```
 - Functions longer than ~20 lines may have brief comments describing each step.
 - Never insert arbitrary ie 80 col manual reflow newlines in markdown documents.
 - all shared dependencies are declared in the workspace Cargo.toml; if one needs no-default-features, disable that at the workspace level and reenable as required
+- for reserved keyword idents, use escaping `r#struct`, never misspelling `strukt`  
 - Beet is cross-platform: use `fs_ext`, `env_ext` instead of `std::fs`/`std::env`, adding missing methods as needed.
+- The one canonical store an app runs from is the **repo store**, marked `RepoStore` and enforced as one per world: `RepoStore` for types, `repo_store` for idents, "repo store" in prose (never "site"/"entry"/"app" store). Every other `BlobStore` is a plain store, named by a `StoreRef` or scoped out of an ancestor by a `DirPath`. Its deploy-side declaration is the store block carrying `RepoStoreBlock` (`<S3BucketBlock label="repo" {RepoStoreBlock}/>`), found by type through `RepoStoreQuery`, never by label.
 - Never scatter new env vars: config flows through request params, a route declaring its flags on its own `Reflect` params type behind `ParamsPartial` so `--help` documents them. `BootstrapConfig` describes ONE process launch: read with `BootstrapConfig::get()`, construct only to launch another process (`ChildProcess::with_bootstrap`).
 - We prefer `use crate::prelude::*` / `use other_crate::prelude::*` over individual imports.
 - Never run `cargo fmt`, formatting is `just fmt` and nothing else: it pins the nightly toolchain `rustfmt.toml` requires and passes `--all`; bare `cargo fmt` silently reformats the tree into a huge bogus diff.
@@ -149,6 +165,7 @@ Never use `.claude/projects/../memory`, all content related to this project must
 - For a plain grouping use `<Fragment>`, not `<div>`: it carries spreads, directives and children but emits no element. (`<Template>` is the *include* front-end, `<Template src="..">`; with no `src` a directives-only no-op.)
 - `<Tag/>` resolves a component/template by short type path and spawns its own entity; `{Spread}` / `{(A, B)}` adds components to the *current* entity. String attributes coerce to the field type (`SmolStr`, `Duration` from `"30s"`, `Option<T>`, enum unit variants), so a reflect component is usually authorable without a template.
 - A `<Tag>`'s children land as its direct children (slots are transparent), so a child-reading handler like `{ExchangeSequence}` (a sequenced route) reads them: `<Route path="deploy" {ExchangeSequence}><MyBlock/><MyAction/></Route>`.
-- **Features remove components, never entities.** A document loads whole in every binary; there is no feature gating. An unregistered uppercase tag warns, marks its entity `UnregisteredTag` and still builds its directives, spreads and children, so a lean binary's tree keeps its shape, only behavior missing. Loudness comes at dispatch: `{RequireFeatures(["infra"])}` on a subtree fails dispatch naming the missing features; a sequence route that skipped every child fails naming unregistered tags; `beet check` elevates `UnregisteredTag` to an error. `<CrateCheck features={[".."]}/>` is the load-time inverse, an entry *demanding* features; `allow_unregistered` opts out a tag whose whole content is the missing behavior (`<LiveReloadScript/>`).
+- **Features remove components, never entities — unless the node is an effect.** By default a document loads whole in every binary: an unregistered uppercase tag warns, marks its entity `UnregisteredTag` and still builds its directives, spreads and children, so a lean binary's tree keeps its shape with only behavior missing. A sequence route that skipped every child fails naming unregistered tags, and `beet check` elevates `UnregisteredTag` to an error.
+- **`bx:cfg` is the one exception, and the only exclusion mechanism.** The markup twin of Rust's `#[cfg]`, with Rust's operators and precedence: `bx:cfg="(feature:infra && feature:extra) || feature:all"` removes its node and subtree from the SYNTAX TREE before the build walk, so nothing downstream observes it. It exists because some nodes are effects rather than structure (`<Template src>` reads a file) and an effect has no inert form. It leaves a `CfgExcluded` tombstone carrying the condition and the element's `path`, so an excluded route still exists and reports why rather than 404ing. Atoms are `namespace:argument` resolved through the `BsxConditions` seam (`feature:`, `version:`, `env:` in core; downstream registers its own), and an unknown namespace is a hard error, never a silent false. `<RequireCfg cfg=".."/>` is the same condition asserted rather than applied: it refuses the whole load, naming every unmet atom at once. `allow_unregistered` opts out a tag whose whole content is the missing behavior (`<LiveReloadScript/>`).
 - A `Router` is a **url space**: its subtree's routes root at it (no ancestor `<Route>` prepends) and it owns its own `RouteTree`, so a whole site mounts under a command route with urls still rooted at `/`, and a dispatching surface can never reach routes outside its namespace. Resolve with `RouteTree::of` (a server's tree lives on its `Router` child), not `entity.get::<RouteTree>()`.
 <!-- beet:sync:end -->
