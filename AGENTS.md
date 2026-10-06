@@ -1,6 +1,6 @@
 # beet_atproto
 
-An AT Protocol (Bluesky) toolkit for the [beet](https://github.com/mrchantey/beet) engine: `crates/shared` wire types, `crates/client` AppView reads, `crates/feed` the feed generator, `crates/infra` the deploy blocks (`<AtprotoHandleBlock/>`, the custom-domain handle records), re-exported by the root `beet_atproto` facade crate. The root package is also a binary: the stock beet cli plus `AtprotoInfraPlugin`, since an entry naming a block defined here can only run from a binary that links it.
+An AT Protocol (Bluesky) toolkit for the [beet](https://github.com/mrchantey/beet) engine, one crate per concern under `crates/` (see Crate layout below) re-exported by the root `beet_atproto` facade crate. The root package is also a binary: the stock beet cli plus `AtprotoInfraPlugin`, since an entry naming a block defined here can only run from a binary that links it.
 
 ## Context
 
@@ -12,16 +12,54 @@ Downstream deltas from the inherited conventions:
 - Tests use `#[beet::test]` and `beet::test_main!()`, the facade re-exports of the beet_core harness. Lib crates gate the `test_main!` invocation behind `#[cfg(test)]` so plain builds do not need the facade's `testing` feature.
 - Direct bevy paths go through `beet::exports::bevy`.
 
+## Crate layout
+
+Where new code goes. One crate per concern, each depending only on the ones above it:
+
+- `crates/shared` (`beet_atproto_shared`): the wire types every other crate shares.
+- The PDS as a store is not here: the protocol primitives (`Tid`, `Rkey`, `Nsid`, `Did`, `Cid`, `AtUri`, `StrongRef`, `BlobRef`), `AtprotoRecord` and `Provenance` live in `beet_core`, and the erased `PdsProvider`/`Pds` family with its `EmulatorPds` backend, `PdsStore` and the converge in `beet_net`, with `XrpcPds`, the `AtprotoAuth` credential seam, did and handle resolution and `<AtprotoAccount/>` behind its `atproto` feature (beet's `.agents/plans/design.md` item 57). Beet's compiler and every runtime need the record format with no network present, and this workspace depends on beet, so knowing nothing beyond `com.atproto.*` puts a type in beet; everything below reaches it through the facade.
+- `crates/client` (`beet_atproto_client`): `AppView`, unauthenticated hydrated reads through the public Bluesky AppView, and `RichText`, the `app.bsky.richtext.facet` builder that resolves mentions through it.
+- `crates/feed` (`beet_atproto_feed`): the feed generator.
+- `crates/standard_site` (`beet_atproto_standard_site`): the `site.standard.*` records, the `content` format renderers, the served site's declaration, route and head links, and behind its own `infra` feature the publish steps and the probe.
+- `crates/infra` (`beet_atproto_infra`): the deploy blocks.
+
+The split is by what a binary carries rather than by subject, because a consumer links halves: a served site links `client` and `standard_site` beside beet's `atproto` feature; a deployer adds `infra` and `standard_site/infra`. A record type belongs to the crate that owns its lexicon authority, so `com.atproto.repo.strongRef` is beet's and `site.standard.document` is `standard_site`.
+
+### The beet-cli features
+
+The site entry at `../beet/site/main.bsx` names tags from here, so `beet-cli` carries two features rather than one: the served site links the lean half and only a deployer links the blocks.
+
+- `atproto`: accounts, repo reads, the AppView and the standard site templates, ie `beet_net/atproto` with `beet_atproto`'s `client` and `standard_site`. Implies no infra, so a lean serving binary can have it.
+- `atproto_infra = ["atproto", "infra", "beet_atproto/infra"]`: the deploy blocks and the publish steps.
+
+Both must appear in `crate_registration!` in `../beet/crates/beet-cli/src/registration.rs`, and a deployed binary's feature string (`<LightsailBeetSiteBlock features=".."/>`, `<LambdaJobBlock features=".."/>`) must name `atproto`, or the deployed site builds its publication tag as nothing.
+
 ## Commands
 
 - `just test`: the workspace crates native suites
-- `just test-live`: live network tests against public Bluesky infrastructure
+- `just test-live`: live network tests against public Bluesky infrastructure (see Live tests below)
 - `just build-wasm`: wasm builds of the lib crates
 - `cargo run --example feed_generator`: serve a whats-alf feed on 8337
 - `cargo run --example client`: read it (or Bluesky's published whats-hot fallback) on 8338
 - `just cli --main=examples/infra/custom_handle_domain.bsx --stage=prod validate`: the handle deployer, ie `cargo run --features=cli --`
 
 The examples double as the tutorial walkthroughs in `examples/*.md`, starting at `examples/README.md`; the deploy entry carries its walkthrough in its own header comment.
+
+## Live tests
+
+`just test-live` runs the suites that talk to real infrastructure. Unauthenticated reads need nothing. A write needs a throwaway account, created by hand once, never one we publish from:
+
+1. Sign up at `bsky.app` with a `*.bsky.social` handle and nothing else filled in.
+2. Settings -> Privacy and security -> App passwords, add one.
+3. From the beet checkout, seal all three into the `agents` group of its `secrets.toml`, which the launch loads into the process environment:
+
+```sh
+beet secrets/set BEET_TEST_ATPROTO_HANDLE --group=agents --role=env_var --note="throwaway bsky.social account for live write tests"
+beet secrets/set BEET_TEST_ATPROTO_DID --group=agents --role=env_var --note="the did of that account, so a test needs no resolution to start"
+beet secrets/set BEET_TEST_ATPROTO_APP_PASSWORD --group=agents --role=env_var --note="app password for that account" --rotation="manual:https://bsky.app/settings/app-passwords"
+```
+
+A live write test reads the three and skips with a note naming them when any is absent, so a fresh checkout passes without the account. The did is stored rather than resolved because a handle can be renamed and a test should not depend on a lookup to decide whether to run.
 
 <!-- beet:sync:begin — beet's AGENTS.md, refreshed by the sync-downstream skill; do not hand-edit -->
 # Agent Instructions
