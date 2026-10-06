@@ -59,7 +59,10 @@ mod test {
 			[("1", "cid1", 100), ("2", "cid2", 300), ("3", "cid3", 200)]
 		{
 			index.insert(IndexedPost {
-				uri: AtUri::post("did:plc:author", rkey).to_string().into(),
+				uri: format!(
+					"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/{rkey}"
+				)
+				.into(),
 				cid: cid.into(),
 				indexed_at_us: time,
 			});
@@ -82,9 +85,9 @@ mod test {
 			.map(|post| post.post.as_str())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![
-				"at://did:plc:author/app.bsky.feed.post/2",
-				"at://did:plc:author/app.bsky.feed.post/3",
-				"at://did:plc:author/app.bsky.feed.post/1",
+				"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/2",
+				"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/3",
+				"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/1",
 			]);
 		skeleton.cursor.unwrap().xpect_eq("100::cid1");
 	}
@@ -112,9 +115,9 @@ mod test {
 			.await
 			.unwrap();
 		second.feed.len().xpect_eq(1);
-		second.feed[0]
-			.post
-			.xpect_eq("at://did:plc:author/app.bsky.feed.post/1");
+		second.feed[0].post.xpect_eq(
+			"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/1",
+		);
 	}
 
 	#[beet::test]

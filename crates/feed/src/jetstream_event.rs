@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -30,22 +29,25 @@ pub struct JetstreamEvent {
 }
 
 impl JetstreamEvent {
-	/// The at uri of the committed record, when this is a commit event.
+	/// The at uri of the committed record, when this is a commit event
+	/// whose did, collection and rkey are well formed.
 	pub fn at_uri(&self) -> Option<AtUri> {
-		self.commit.as_ref().map(|commit| {
-			AtUri::new(
-				self.did.clone(),
-				commit.collection.clone(),
-				commit.rkey.clone(),
-			)
-		})
+		let commit = self.commit.as_ref()?;
+		AtUri::new(
+			Did::parse(&self.did).ok()?,
+			Nsid::parse(&commit.collection).ok()?,
+			Rkey::parse(&commit.rkey).ok()?,
+		)
+		.xsome()
 	}
 
 	/// The typed post record, when this is a post commit carrying a record.
 	pub fn post_record(&self) -> Option<PostRecord> {
 		self.commit
 			.as_ref()
-			.filter(|commit| commit.collection == POST_NSID)
+			.filter(|commit| {
+				commit.collection == PostRecord::COLLECTION.as_str()
+			})
 			.and_then(|commit| commit.record.as_ref())
 			.and_then(|record| serde_json::from_value(record.clone()).ok())
 	}
@@ -112,7 +114,7 @@ pub(crate) mod test {
 
 	/// A post create in the same shape.
 	pub(crate) const POST_CREATE: &str = r#"{
-		"did": "did:plc:author",
+		"did": "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa",
 		"time_us": 1725911162329308,
 		"kind": "commit",
 		"commit": {
@@ -132,7 +134,7 @@ pub(crate) mod test {
 
 	/// A post delete: no record, no cid.
 	pub(crate) const POST_DELETE: &str = r#"{
-		"did": "did:plc:author",
+		"did": "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa",
 		"time_us": 1725911163000000,
 		"kind": "commit",
 		"commit": {
@@ -173,11 +175,9 @@ pub(crate) mod test {
 		let post = event.post_record().unwrap();
 		post.text.xpect_eq("have you seen alf lately?");
 		post.created_at.xpect_eq("2024-09-09T19:46:02.102Z");
-		event
-			.at_uri()
-			.unwrap()
-			.to_string()
-			.xpect_eq("at://did:plc:author/app.bsky.feed.post/3l3rkey");
+		event.at_uri().unwrap().to_string().xpect_eq(
+			"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/3l3rkey",
+		);
 	}
 
 	#[beet::test]

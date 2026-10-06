@@ -39,18 +39,3 @@ async fn appview_hydrates_live() {
 		.collect::<Vec<_>>()
 		.xpect_eq(uris);
 }
-
-/// The handle a custom domain publishes, resolved through the same call the
-/// deploy's handle probe makes. `bsky.app` is itself a custom-domain handle
-/// (the account behind the Discover feed), so this asserts the whole
-/// dns-record-to-did path against a name nobody is going to retire.
-#[ignore = "requires external network"]
-#[beet::test(timeout_ms = 60_000)]
-async fn resolves_a_custom_domain_handle_live() {
-	AppView::default()
-		.resolve_handle("bsky.app")
-		.await
-		.unwrap()
-		.as_str()
-		.xpect_eq(AtUri::parse(DISCOVER_FEED_URI).unwrap().authority.as_str());
-}

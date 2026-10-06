@@ -14,7 +14,7 @@ pub struct FeedGenerator {
 	pub hostname: SmolStr,
 	/// The service did, defaulting to `did:web:{hostname}`.
 	pub service_did: SmolStr,
-	/// The did of the account publishing the feed records, eg `did:plc:abc`.
+	/// The did of the account publishing the feed records, eg `did:plc:z72i7hdynmk6r22z27h6tvur`.
 	pub publisher_did: SmolStr,
 }
 
@@ -33,6 +33,20 @@ impl FeedGenerator {
 		}
 	}
 
+	/// The collection a feed's declaration record lives in.
+	pub const COLLECTION: Nsid = Nsid::new_static("app.bsky.feed.generator");
+
+	/// The address of the feed declared at `rkey`, ie
+	/// `at://{publisher}/app.bsky.feed.generator/{rkey}`.
+	pub fn feed_uri(&self, rkey: &str) -> Result<AtUri> {
+		AtUri::new(
+			Did::parse(&self.publisher_did)?,
+			Self::COLLECTION,
+			Rkey::parse(rkey)?,
+		)
+		.xok()
+	}
+
 	/// Override the service did, eg for a did:plc service.
 	pub fn with_service_did(mut self, service_did: impl Into<SmolStr>) -> Self {
 		self.service_did = service_did.into();
@@ -49,7 +63,7 @@ impl FeedGenerator {
 /// # use beet_atproto_feed::prelude::*;
 /// let mut world = (AsyncPlugin, RouterPlugin).into_world();
 /// world.spawn((Router::with_defaults(), children![(
-/// 	feed_generator(FeedGenerator::new("feed.example.com", "did:plc:me")),
+/// 	feed_generator(FeedGenerator::new("feed.example.com", "did:plc:pppppppppppppppppppppppp")),
 /// 	children![(
 /// 		FeedDef::new("whats-alf"),
 /// 		ChronologicalFeed,
@@ -144,14 +158,14 @@ pub async fn GetFeedSkeleton(
 		), Result<Option<Entity>>>(move |entity, (generators, feeds)| {
 			let generator_entity = generators.get_entity(entity)?;
 			let config = generators.get(entity)?;
-			if feed_uri.authority != config.publisher_did
-				|| feed_uri.collection != FEED_GENERATOR_NSID
+			if feed_uri.did().as_str() != config.publisher_did
+				|| *feed_uri.collection() != FeedGenerator::COLLECTION
 			{
 				return None.xok();
 			}
 			feeds
 				.iter()
-				.filter(|(_, def)| def.rkey == feed_uri.rkey)
+				.filter(|(_, def)| def.rkey == feed_uri.rkey().as_str())
 				.find(|(feed_entity, _)| {
 					generators.get_entity(*feed_entity).ok()
 						== Some(generator_entity)
@@ -194,15 +208,11 @@ pub fn DescribeFeedGenerator(
 			generators.get_entity(*feed_entity).ok() == Some(generator_entity)
 		})
 		.map(|(_, def)| {
-			serde_json::json!({
-				"uri": AtUri::feed_generator(
-					config.publisher_did.clone(),
-					def.rkey.clone(),
-				)
-				.to_string()
-			})
+			config
+				.feed_uri(&def.rkey)
+				.map(|uri| serde_json::json!({ "uri": uri.to_string() }))
 		})
-		.collect::<Vec<_>>();
+		.collect::<Result<Vec<_>>>()?;
 	Response::ok_json(&serde_json::json!({
 		"did": config.service_did,
 		"feeds": feed_uris,
@@ -251,14 +261,13 @@ mod test {
 	use beet::exports::bevy::ecs::system::RunSystemOnce;
 	use beet::prelude::*;
 
-	const FEED_URI: &str =
-		"at://did:plc:publisher/app.bsky.feed.generator/whats-alf";
+	const FEED_URI: &str = "at://did:plc:pppppppppppppppppppppppp/app.bsky.feed.generator/whats-alf";
 
 	fn test_tree() -> impl Bundle {
 		(Router::with_defaults(), children![(
 			feed_generator(FeedGenerator::new(
 				"feed.example.com",
-				"did:plc:publisher",
+				"did:plc:pppppppppppppppppppppppp",
 			)),
 			children![(
 				FeedDef::new("whats-alf"),
@@ -282,7 +291,10 @@ mod test {
 			[("1", "cid1", 100), ("2", "cid2", 300), ("3", "cid3", 200)]
 		{
 			index.insert(IndexedPost {
-				uri: AtUri::post("did:plc:author", rkey).to_string().into(),
+				uri: format!(
+					"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/{rkey}"
+				)
+				.into(),
 				cid: cid.into(),
 				indexed_at_us: time,
 			});
@@ -307,9 +319,9 @@ mod test {
 			.map(|post| post.post.as_str())
 			.collect::<Vec<_>>()
 			.xpect_eq(vec![
-				"at://did:plc:author/app.bsky.feed.post/2",
-				"at://did:plc:author/app.bsky.feed.post/3",
-				"at://did:plc:author/app.bsky.feed.post/1",
+				"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/2",
+				"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/3",
+				"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/1",
 			]);
 		skeleton.cursor.unwrap().xpect_eq("100::cid1");
 	}
@@ -338,9 +350,9 @@ mod test {
 			.await
 			.unwrap();
 		second.feed.len().xpect_eq(1);
-		second.feed[0]
-			.post
-			.xpect_eq("at://did:plc:author/app.bsky.feed.post/1");
+		second.feed[0].post.xpect_eq(
+			"at://did:plc:aaaaaaaaaaaaaaaaaaaaaaaa/app.bsky.feed.post/1",
+		);
 	}
 
 	#[beet::test(timeout_ms = 10000)]
@@ -348,11 +360,11 @@ mod test {
 		let (mut world, root) = seeded_world();
 		for feed in [
 			// unknown rkey
-			"at://did:plc:publisher/app.bsky.feed.generator/nope",
+			"at://did:plc:pppppppppppppppppppppppp/app.bsky.feed.generator/nope",
 			// wrong publisher
-			"at://did:plc:other/app.bsky.feed.generator/whats-alf",
+			"at://did:plc:oooooooooooooooooooooooo/app.bsky.feed.generator/whats-alf",
 			// wrong collection
-			"at://did:plc:publisher/app.bsky.feed.post/whats-alf",
+			"at://did:plc:pppppppppppppppppppppppp/app.bsky.feed.post/whats-alf",
 		] {
 			let response = world
 				.entity_mut(root)
@@ -429,8 +441,11 @@ mod test {
 		let mut world = (AsyncPlugin, RouterPlugin).into_world();
 		let root = world
 			.spawn((Router::with_defaults(), children![feed_generator(
-				FeedGenerator::new("feed.example.com", "did:plc:publisher")
-					.with_service_did("did:web:other.com"),
+				FeedGenerator::new(
+					"feed.example.com",
+					"did:plc:pppppppppppppppppppppppp"
+				)
+				.with_service_did("did:web:other.com"),
 			)]))
 			.flush();
 		world

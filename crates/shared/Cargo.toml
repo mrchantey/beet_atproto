@@ -2,7 +2,7 @@
 name = "beet_atproto_shared"
 version.workspace = true
 edition.workspace = true
-description = "AT Protocol wire types shared by the beet_atproto crates"
+description = "The feed generator wire types the beet_atproto client and feed share"
 
 [dependencies]
 beet = { workspace = true, features = ["std", "json"] }

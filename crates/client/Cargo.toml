@@ -15,7 +15,7 @@ ureq = ["beet/ureq"]
 
 [dependencies]
 beet_atproto_shared = { workspace = true }
-beet = { workspace = true, features = ["std", "json", "net"] }
+beet = { workspace = true, features = ["std", "json", "net", "atproto"] }
 serde = { workspace = true }
 
 [dev-dependencies]

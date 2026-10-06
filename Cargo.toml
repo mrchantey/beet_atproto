@@ -9,8 +9,7 @@ edition = "2024"
 beet_atproto_shared = { path = "crates/shared", version = "0.1.0" }
 beet_atproto_client = { path = "crates/client", version = "0.1.0" }
 beet_atproto_feed = { path = "crates/feed", version = "0.1.0" }
-beet_atproto_infra = { path = "crates/infra", version = "0.1.0" }
-# The local beet checkout, like beet_esp. Crates depend on the `beet` facade
+# The local beet checkout. Crates depend on the `beet` facade
 # rather than the individual beet crates so `#[action]`/`#[template]` macro
 # expansions (which emit `beet::` paths downstream) resolve; each crate turns
 # on only the facade features it needs.
@@ -41,16 +40,6 @@ description = "An AT Protocol (Bluesky) toolkit for the beet engine"
 default = ["client", "feed"]
 client = ["dep:beet_atproto_client"]
 feed = ["dep:beet_atproto_feed"]
-# The deploy blocks: `<AtprotoHandleBlock/>` and the probe that asserts its
-# records resolve. The probe reads handles through the AppView, so it carries
-# `client` with it.
-infra = ["dep:beet_atproto_infra", "client"]
-# This workspace's own beet binary: `BeetPlugins` + `AtprotoInfraPlugin` +
-# `LaunchPlugin`,
-# so an entry declaring `<AtprotoHandleBlock/>` resolves it. Off by default, so a
-# library consumer never links the runner; the `[[bin]]` below requires it, which
-# is what makes a flagless `cargo run` fail with cargo's own guidance.
-cli = ["infra", "ureq", "rustls-tls", "dep:beet"]
 # transports forwarded to the beet stack: the jetstream `wss://` socket and the
 # xrpc `https://` clients
 tungstenite = ["beet_atproto_feed?/tungstenite"]
@@ -62,28 +51,6 @@ ureq = ["beet_atproto_client?/ureq", "beet_atproto_feed?/ureq"]
 beet_atproto_shared = { workspace = true }
 beet_atproto_client = { workspace = true, optional = true }
 beet_atproto_feed = { workspace = true, optional = true }
-beet_atproto_infra = { workspace = true, optional = true }
-
-# the binary, inert without `cli`: `launch` is the entry loader (`router` +
-# `template_serde`), `mail` carries the `<ZoneAudit/>` the entry declares (and
-# `deploy` + `aws_sdk` with it), and `extra` the `<DeployRoutes/>` /
-# `<StateBackendToggle/>` templates. No `beet-cli`: the runner is in the facade,
-# and the dev commands are the cli binary's own business.
-beet = { workspace = true, optional = true, features = [
-	"std",
-	"json",
-	"markdown",
-	"style",
-	"template",
-	"template_serde",
-	"serde_plain",
-	"router",
-	"fs",
-	"deploy",
-	"cloudflare_dns",
-	"mail",
-	"extra",
-] }
 
 [dev-dependencies]
 # everything the examples need, so `cargo run --example ..` needs no flags
@@ -116,15 +83,3 @@ required-features = ["feed"]
 name = "client"
 path = "examples/client.rs"
 required-features = ["client"]
-
-# 💡 Binary
-
-# This workspace's beet binary: `BeetPlugins` + `AtprotoInfraPlugin` +
-# `LaunchPlugin`.
-# The stock `beet` binary serves a workspace that only names beet types; a
-# workspace that EXTENDS beet builds its own, which is exactly what a block
-# defined out of tree needs.
-[[bin]]
-name = "beet_atproto"
-path = "src/main.rs"
-required-features = ["cli"]

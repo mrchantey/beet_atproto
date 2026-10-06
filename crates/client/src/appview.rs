@@ -1,10 +1,5 @@
-use crate::prelude::*;
 use beet::prelude::*;
 use serde::Deserialize;
-
-/// The public unauthenticated AppView, serving hydrated reads to logged out
-/// clients.
-pub const PUBLIC_APPVIEW: &str = "https://public.api.bsky.app";
 
 /// The `getPosts` lexicon caps each call at 25 uris.
 pub const MAX_GET_POSTS_URIS: usize = 25;
@@ -21,12 +16,12 @@ pub const DISCOVER_FEED_URI: &str =
 /// so a client needs only an http transport (eg the `ureq` and a tls feature).
 #[derive(Debug, Clone)]
 pub struct AppView {
-	/// The AppView host, defaults to [`PUBLIC_APPVIEW`].
+	/// The AppView host, defaults to [`HandleResolver::PUBLIC_APPVIEW`].
 	pub host: String,
 }
 
 impl Default for AppView {
-	fn default() -> Self { Self::new(PUBLIC_APPVIEW) }
+	fn default() -> Self { Self::new(HandleResolver::PUBLIC_APPVIEW) }
 }
 
 impl AppView {
@@ -85,38 +80,6 @@ impl AppView {
 			.await?
 			.json::<GetFeedResponse>()
 			.await
-	}
-
-	/// The did a handle currently resolves to, eg `alice.example.com` ->
-	/// `did:plc:...`.
-	///
-	/// The one read that answers "is this custom domain wired up", because the
-	/// AppView's resolver walks exactly what every other client walks: the
-	/// `_atproto.<handle>` TXT record, else the handle's
-	/// `/.well-known/atproto-did`. A handle nothing points at is an error
-	/// rather than an empty answer.
-	pub async fn resolve_handle(&self, handle: &str) -> Result<SmolStr> {
-		self.resolve_handle_request(handle)
-			.send()
-			.await?
-			.into_result()
-			.await?
-			.json::<ResolveHandleResponse>()
-			.await?
-			.did
-			.xmap(SmolStr::from)
-			.xok()
-	}
-
-	/// The `resolveHandle` request for one handle. The handle rides as a param
-	/// rather than being formatted into the url, so it is escaped by the same
-	/// query builder every other beet request uses.
-	fn resolve_handle_request(&self, handle: &str) -> Request {
-		Request::get(format!(
-			"{}/xrpc/com.atproto.identity.resolveHandle",
-			self.host
-		))
-		.with_param("handle", handle)
 	}
 
 	/// The `getPosts` url for one chunk, repeating the `uris` array param.
@@ -339,29 +302,6 @@ mod test {
 			.unwrap()
 			.cursor
 			.xpect_none();
-	}
-
-	/// The handle is a query param rather than an interpolation, so a
-	/// declaration that is not a bare domain cannot corrupt the request.
-	#[beet::test]
-	fn builds_resolve_handle_url() {
-		AppView::default()
-			.resolve_handle_request("alice.example.com")
-			.request_parts()
-			.uri()
-			.xpect_eq(
-				"https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=alice.example.com",
-			);
-	}
-
-	#[beet::test]
-	fn deserializes_resolved_handle() {
-		serde_json::from_str::<ResolveHandleResponse>(
-			r#"{ "did": "did:plc:z72i7hdynmk6r22z27h6tvur" }"#,
-		)
-		.unwrap()
-		.did
-		.xpect_eq("did:plc:z72i7hdynmk6r22z27h6tvur");
 	}
 
 	#[beet::test]

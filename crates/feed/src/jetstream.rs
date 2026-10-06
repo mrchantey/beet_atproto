@@ -43,7 +43,7 @@ impl Default for Jetstream {
 	fn default() -> Self {
 		Self {
 			endpoint: PUBLIC_JETSTREAM_ENDPOINTS[1].into(),
-			collections: vec![POST_NSID.into()],
+			collections: vec![PostRecord::COLLECTION.as_str().into()],
 			cursor: None,
 			backoff: Self::default_backoff(),
 		}
@@ -174,7 +174,7 @@ pub fn index_posts(
 	let Some(commit) = &event.commit else {
 		return;
 	};
-	if commit.collection != POST_NSID {
+	if commit.collection != PostRecord::COLLECTION.as_str() {
 		return;
 	}
 	let Some(uri) = event.at_uri() else {
@@ -222,8 +222,10 @@ mod test {
 	#[beet::test]
 	fn builds_subscribe_url() {
 		let mut jetstream = Jetstream::new("wss://example.com/subscribe");
-		jetstream.collections =
-			vec![POST_NSID.into(), "app.bsky.feed.like".into()];
+		jetstream.collections = vec![
+			PostRecord::COLLECTION.as_str().into(),
+			"app.bsky.feed.like".into(),
+		];
 		jetstream.cursor = Some(123);
 		jetstream.subscribe_url().xpect_eq(
 			"wss://example.com/subscribe?wantedCollections=app.bsky.feed.post&wantedCollections=app.bsky.feed.like&cursor=123",

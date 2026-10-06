@@ -80,7 +80,7 @@ impl PublishFeed {
 		.with_auth_bearer(&session.access_jwt)
 		.with_json_body(&serde_json::json!({
 			"repo": session.did,
-			"collection": FEED_GENERATOR_NSID,
+			"collection": FeedGenerator::COLLECTION,
 			"rkey": self.record_name,
 			"record": record,
 		}))?
@@ -88,7 +88,12 @@ impl PublishFeed {
 		.await?
 		.into_result()
 		.await?;
-		AtUri::feed_generator(session.did, self.record_name.clone()).xok()
+		AtUri::new(
+			Did::parse(&session.did)?,
+			FeedGenerator::COLLECTION,
+			Rkey::parse(&self.record_name)?,
+		)
+		.xok()
 	}
 
 	/// Delete the declaration record, removing the feed from the app.
@@ -101,7 +106,7 @@ impl PublishFeed {
 		.with_auth_bearer(&session.access_jwt)
 		.with_json_body(&serde_json::json!({
 			"repo": session.did,
-			"collection": FEED_GENERATOR_NSID,
+			"collection": FeedGenerator::COLLECTION,
 			"rkey": self.record_name,
 		}))?
 		.send()
@@ -131,7 +136,7 @@ impl PublishFeed {
 	/// The `app.bsky.feed.generator` record body.
 	fn record_json(&self, created_at: &str) -> serde_json::Value {
 		let mut record = serde_json::json!({
-			"$type": FEED_GENERATOR_NSID,
+			"$type": FeedGenerator::COLLECTION,
 			"did": self.feed_did,
 			"displayName": self.display_name,
 			"createdAt": created_at,
@@ -163,7 +168,7 @@ mod test {
 		record["$type"]
 			.as_str()
 			.unwrap()
-			.xpect_eq(FEED_GENERATOR_NSID);
+			.xpect_eq(FeedGenerator::COLLECTION.as_str());
 		record["did"]
 			.as_str()
 			.unwrap()
