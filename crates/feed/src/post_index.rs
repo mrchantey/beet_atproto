@@ -95,13 +95,13 @@ impl PostIndex {
 /// reference implementation's indexing filter as a component.
 #[derive(Clone, Component)]
 pub struct PostFilter(
-	Arc<dyn 'static + Send + Sync + Fn(&JetstreamEvent, &PostRecord) -> bool>,
+	Arc<dyn 'static + Send + Sync + Fn(&JetstreamEvent, &FeedPost) -> bool>,
 );
 
 impl PostFilter {
 	/// A custom filter over the event and its parsed post record.
 	pub fn new(
-		func: impl 'static + Send + Sync + Fn(&JetstreamEvent, &PostRecord) -> bool,
+		func: impl 'static + Send + Sync + Fn(&JetstreamEvent, &FeedPost) -> bool,
 	) -> Self {
 		Self(Arc::new(func))
 	}
@@ -116,7 +116,7 @@ impl PostFilter {
 	}
 
 	/// Apply the filter.
-	pub fn matches(&self, ev: &JetstreamEvent, post: &PostRecord) -> bool {
+	pub fn matches(&self, ev: &JetstreamEvent, post: &FeedPost) -> bool {
 		(self.0)(ev, post)
 	}
 }
@@ -193,7 +193,7 @@ mod test {
 			crate::jetstream_event::test::POST_CREATE,
 		)
 		.unwrap();
-		let post = event.post_record().unwrap();
+		let post = event.feed_post().unwrap();
 		PostFilter::text_contains("ALF")
 			.matches(&event, &post)
 			.xpect_true();

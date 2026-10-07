@@ -14,7 +14,7 @@ pub const PUBLIC_JETSTREAM_ENDPOINTS: [&str; 4] = [
 ///
 /// Unknown kinds and collections are tolerated: `commit` is only present on
 /// `kind: "commit"` events and `record` is a raw value with typed views like
-/// [`Self::post_record`].
+/// [`Self::feed_post`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JetstreamEvent {
 	/// The repo (account) did this event belongs to.
@@ -41,13 +41,11 @@ impl JetstreamEvent {
 		.xsome()
 	}
 
-	/// The typed post record, when this is a post commit carrying a record.
-	pub fn post_record(&self) -> Option<PostRecord> {
+	/// The `app.bsky.feed.post`, when this is a post commit carrying a record.
+	pub fn feed_post(&self) -> Option<FeedPost> {
 		self.commit
 			.as_ref()
-			.filter(|commit| {
-				commit.collection == PostRecord::COLLECTION.as_str()
-			})
+			.filter(|commit| commit.collection == FeedPost::COLLECTION.as_str())
 			.and_then(|commit| commit.record.as_ref())
 			.and_then(|record| serde_json::from_value(record.clone()).ok())
 	}
@@ -162,7 +160,7 @@ pub(crate) mod test {
 			"bafyreidwaivazkwu67xztlmuobx35hs2lnfh3kolmgfmucldvhd3sgzcqi",
 		);
 		// likes carry no post record
-		event.post_record().xpect_none();
+		event.feed_post().xpect_none();
 		event.at_uri().unwrap().to_string().xpect_eq(
 			"at://did:plc:eygmaihciaxprqvxpfvl6flk/app.bsky.feed.like/3l3qo2vuowo2b",
 		);
@@ -172,7 +170,7 @@ pub(crate) mod test {
 	fn deserializes_post_create() {
 		let event =
 			serde_json::from_str::<JetstreamEvent>(POST_CREATE).unwrap();
-		let post = event.post_record().unwrap();
+		let post = event.feed_post().unwrap();
 		post.text.xpect_eq("have you seen alf lately?");
 		post.created_at.xpect_eq("2024-09-09T19:46:02.102Z");
 		event.at_uri().unwrap().to_string().xpect_eq(
@@ -188,6 +186,6 @@ pub(crate) mod test {
 		commit.operation.xpect_eq(CommitOperation::Delete);
 		commit.record.as_ref().xpect_none();
 		commit.cid.as_ref().xpect_none();
-		event.post_record().xpect_none();
+		event.feed_post().xpect_none();
 	}
 }

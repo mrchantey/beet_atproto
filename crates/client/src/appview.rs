@@ -147,7 +147,7 @@ pub struct AppViewPost {
 	/// The posting account.
 	pub author: ProfileViewBasic,
 	/// The `app.bsky.feed.post` record.
-	pub record: PostRecord,
+	pub record: FeedPost,
 	/// The number of replies, absent unless non-zero.
 	#[serde(default, rename = "replyCount")]
 	pub reply_count: u64,

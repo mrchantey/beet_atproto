@@ -14,7 +14,7 @@ Downstream deltas from the inherited conventions:
 
 ## Crate layout
 
-The protocol's core lives in beet, each piece behind its crate's `atproto` feature (beet's `.agents/plans/design.md` item 57): the primitives, `AtprotoRecord` and `Provenance` in `beet_core`; the `Pds` family, the converge, `XrpcPds`, the `AtprotoAuth` seam, did and handle resolution, `<AtprotoAccount/>`, `PostRecord` and `RichText` in `beet_net`; the handle block and its probe in `beet_infra`. Their words are those crates' module docs. Nothing new is built here that beet will use; what stays is what no beet use needs yet, each upstreamed the same way when one arrives:
+The protocol's core lives in beet, each piece behind its crate's `atproto` feature (beet's `.agents/plans/design.md` item 57): the primitives, `AtprotoRecord` and `Provenance` in `beet_core`; the `Pds` family, the converge, `XrpcPds`, the `AtprotoAuth` seam, did and handle resolution, `<AtprotoAccount/>`, `FeedPost` and `RichText` in `beet_net`; the handle block and its probe in `beet_infra`. Their words are those crates' module docs. Nothing new is built here that beet will use; what stays is what no beet use needs yet, each upstreamed the same way when one arrives:
 
 - `crates/client` (`beet_atproto_client`): `AppView`, unauthenticated hydrated reads through the public Bluesky AppView, due upstream with beet's plan 1 phase 10 comments.
 - `crates/feed` (`beet_atproto_feed`): the feed generator. Its `PublishFeed` still speaks `createSession` and `putRecord` itself, and moves onto beet's `Pds` and `AppPassword` when it is upstreamed.

@@ -8,7 +8,7 @@ A feed generator is a service that answers `app.bsky.feed.getFeedSkeleton` with 
 - `crates/client` (`beet_atproto_client`): `AppView`, unauthenticated hydrated reads through the public Bluesky AppView, and `FeedFollow`, polling a feed without repeats.
 - `crates/feed` (`beet_atproto_feed`): the generator: `Jetstream` firehose ingestion into `PostFilter` + `PostIndex` feeds, the xrpc skeleton routes (`feed_generator`), and the `PublishFeed` declaration record flow.
 
-The protocol's core is beet's own, each piece behind its crate's `atproto` feature: the record primitives (`Did`, `AtUri`, `Tid`, `Cid`, `StrongRef`, `BlobRef`) in `beet_core`, an account's repo as a provider (`Pds`, the converge, `XrpcPds`, handle resolution, `PostRecord`, `RichText`) in `beet_net`, and the custom-domain handle block in `beet_infra`. The root `beet_atproto` crate re-exports the workspace crates behind `client`/`feed` features (both on by default), with `tungstenite`/`ureq`/`native-tls`/`rustls-tls` forwarding transports to the beet stack.
+The protocol's core is beet's own, each piece behind its crate's `atproto` feature: the record primitives (`Did`, `AtUri`, `Tid`, `Cid`, `StrongRef`, `BlobRef`) in `beet_core`, an account's repo as a provider (`Pds`, the converge, `XrpcPds`, handle resolution, `FeedPost`, `RichText`) in `beet_net`, and the custom-domain handle block in `beet_infra`. The root `beet_atproto` crate re-exports the workspace crates behind `client`/`feed` features (both on by default), with `tungstenite`/`ureq`/`native-tls`/`rustls-tls` forwarding transports to the beet stack.
 
 ```rust,ignore
 use beet::prelude::*;

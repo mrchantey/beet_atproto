@@ -43,7 +43,7 @@ impl Default for Jetstream {
 	fn default() -> Self {
 		Self {
 			endpoint: PUBLIC_JETSTREAM_ENDPOINTS[1].into(),
-			collections: vec![PostRecord::COLLECTION.as_str().into()],
+			collections: vec![FeedPost::COLLECTION.as_str().into()],
 			cursor: None,
 			backoff: Self::default_backoff(),
 		}
@@ -174,7 +174,7 @@ pub fn index_posts(
 	let Some(commit) = &event.commit else {
 		return;
 	};
-	if commit.collection != PostRecord::COLLECTION.as_str() {
+	if commit.collection != FeedPost::COLLECTION.as_str() {
 		return;
 	}
 	let Some(uri) = event.at_uri() else {
@@ -183,7 +183,7 @@ pub fn index_posts(
 	let uri = SmolStr::from(uri.to_string());
 	match commit.operation {
 		CommitOperation::Create => {
-			let Some(post) = event.post_record() else {
+			let Some(post) = event.feed_post() else {
 				return;
 			};
 			let Some(cid) = commit.cid.clone() else {
@@ -223,7 +223,7 @@ mod test {
 	fn builds_subscribe_url() {
 		let mut jetstream = Jetstream::new("wss://example.com/subscribe");
 		jetstream.collections = vec![
-			PostRecord::COLLECTION.as_str().into(),
+			FeedPost::COLLECTION.as_str().into(),
 			"app.bsky.feed.like".into(),
 		];
 		jetstream.cursor = Some(123);
