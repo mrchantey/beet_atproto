@@ -42,7 +42,7 @@ async fn end_to_end_live() {
 		.spawn((Router::with_defaults(), children![(
 			feed_generator(FeedGenerator::new(
 				"feed.example.com",
-				"did:example:alice",
+				"did:plc:pppppppppppppppppppppppp",
 			)),
 			children![(
 				FeedDef::new("whats-alf"),
@@ -70,7 +70,7 @@ async fn end_to_end_live() {
 		.world_mut()
 		.entity_mut(root)
 		.exchange(Request::get(
-			"xrpc/app.bsky.feed.getFeedSkeleton?feed=at://did:example:alice/app.bsky.feed.generator/whats-alf&limit=3",
+			"xrpc/app.bsky.feed.getFeedSkeleton?feed=at://did:plc:pppppppppppppppppppppppp/app.bsky.feed.generator/whats-alf&limit=3",
 		))
 		.await
 		.json::<FeedSkeleton>()

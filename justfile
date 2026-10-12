@@ -17,7 +17,8 @@ fmt *args:
 	# `rustfmt.toml`, reformatting the whole tree into a huge bogus diff.
 	rustup toolchain list | grep -q '^{{ fmt-toolchain }}' \
 		|| rustup toolchain install {{ fmt-toolchain }} --profile minimal --component rustfmt
-	cargo +{{ fmt-toolchain }} fmt --all {{ args }}
+	# `-p`, not `--all`: `--all` also formats path dependencies, ie `../beet`
+	cargo +{{ fmt-toolchain }} fmt -p beet_atproto -p beet_atproto_shared -p beet_atproto_client -p beet_atproto_feed {{ args }}
 
 # Native tests for the three crates (the beet harness; pass `--snap` to update snapshots).
 test *args:

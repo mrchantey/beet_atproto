@@ -51,11 +51,13 @@ Situational cheatsheets, read before touching the subsystem:
 - Actions: one-per-entity, overloads, providers, `#[field]`, facets: `crates/beet_action/README.md`
 - Servers and the lifecycle verbs: `crates/beet_net/README.md`
 - Cloud resources: stacks, grants, buckets, jobs: `crates/beet_infra/README.md` + `.agents/skills/infra-deploy`
+- Deploy credentials, `<stack>/deploy` and `--elevated` (no mint verb; an agent relays a refusal to the operator as it is): `crates/beet_infra/README.md`, "Deploy, and deploy elevated"
 - The beet CLI, entries, wasm binaries, making any binary a beet runtime: `crates/beet-cli/README.md` + `crates/beet_router/src/launch/mod.rs`
 - Styling: `crates/beet_ui/src/style/mod.rs`
 - Scene editing (tree, inspector, entity and component pickers): `crates/beet_ui/src/widgets/scene_editor/mod.rs`
 - Rendering (web + charcell): the `beet-rendering` skill
 - Secrets (the age identity, `secrets.toml`, the `vault`/`secrets` verbs, a stack's secret store): `crates/beet_core/src/secrets/mod.rs` + `site/routes/docs/secrets.md`
+- Atproto (records and their primitives, an account's repo as a `Pds`, the converge, `<AtprotoAccount/>`, the live test account): `crates/beet_core/src/atproto/mod.rs` + `crates/beet_net/src/atproto/mod.rs`; the standard.site records: `crates/beet_router/src/router/site/syndication/standard_site/mod.rs`
 
 ## Workflow
 
@@ -70,7 +72,7 @@ Situational cheatsheets, read before touching the subsystem:
 - Beet is cross-platform: use `fs_ext`, `env_ext` instead of `std::fs`/`std::env`, adding missing methods as needed.
 - prefer `beet::prelude::cfg_if!` over attributes where appropriate
 - The one canonical store a runtime runs from is the **repo store**: `RepoStore` for types, `repo_store` for idents, "repo store" in prose (never "site"/"entry"/"app" store), enforced one per world. Every other `BlobStore` is a plain store, named by a `StoreRef`, or one field per role where a consumer needs several, or scoped out of an ancestor by a `DirPath`. Its deploy-side declaration is the store block carrying `RepoStoreBlock`, found by type through `RepoStoreQuery`, never by label.
-- Never scatter new env vars: config flows through request params, a route declaring its flags on its own `Reflect` params type behind `ParamsPartial` so `--help` documents them. `BootstrapConfig` describes ONE process launch: read with `BootstrapConfig::get()`, construct only to launch another process (`ChildProcess::with_bootstrap`).
+- Never scatter new env vars: config flows through request params, a route declaring its flags on its own `Reflect` params type behind `ParamsPartial` so `--help` documents them, a middleware or server declaring what it reads on its type (`#[reflect(DeclaresParams)]`), since a `RejectUnknownParams` server refuses anything undeclared (`crates/beet_router/README.md`, Params). `BootstrapConfig` describes ONE process launch: read with `BootstrapConfig::get()`, construct only to launch another process (`ChildProcess::with_bootstrap`).
 - Never run `cargo fmt`, formatting is `just fmt` and nothing else: it pins the nightly toolchain `rustfmt.toml` requires and passes `--all`; bare `cargo fmt` reformats the tree into a huge bogus diff.
 - `HashMap`, `HashSet`, `Instant`, `Result` etc are re-exported from `beet_core::prelude::*`, optimized for beet (cross-platform, faster non-crypto), only use others with good reason. Prefer `SmolStr` for strings likely to be small.
 - Always use `bevyhow!{}`, `bevybail!{}` unless a consumer needs the error type, then `thiserror` (now no_std). Never wrap errors (`.map_err(|e| bevyhow!("{e}"))?`): `BevyError` implements `From<E: Error>`, just use `?`.
@@ -111,9 +113,9 @@ Situational cheatsheets, read before touching the subsystem:
 
 - Observers can accept closures capturing their environment, systems cannot: use input parameters, `fn my_system(foo: In<Foo>, ..)`.
 - prefer `world.spawn((Parent, children![(Child, ..)]))` over a second spawn with `ChildOf`, unless the child entity needs tracking.
-- Formalize any remotely complex traversal as a `SystemParam` (see `card_query.rs`) or use the existing helpers (`AncestorQuery`, ..); avoid traversing with world directly, use `world.run_system_once(..)` or the often more ergonomic `world.with_state::<MyQuery>(|my_query| ..)`.
+- Formalize any remotely complex traversal as a `SystemParam` (see `card_query.rs`) or use the existing helpers (`AncestorQuery`, `RenderTreeQuery` for any walk over a rendered tree, which steps through each `Portal`, ..); avoid traversing with world directly, use `world.run_system_once(..)` or the often more ergonomic `world.with_state::<MyQuery>(|my_query| ..)`.
 - Prefer `Populated` over `Query`, which skips the system when the query is empty; for an 'any of these queries' pattern use `.run_if(|a, b| !a.is_empty() || !b.is_empty())`.
-- A `#[template]` is a constructor returning `impl Bundle` (or `()` for effects, or `Result<impl Bundle>`), not a UI-only thing; `#[template(system)]` takes `SystemParam`s and does arbitrary ECS work at build time. Prefer a `<MyThing/>` template over a reflect-marker + `On<Insert>` observer: it expands away at build, leaving no component to re-fire on scene reload.
+- A `#[template]` is a constructor returning `impl Bundle` (or `()` for effects, or `Result<impl Bundle>`), not a UI-only thing; `#[template(system)]` takes `SystemParam`s and does arbitrary ECS work at build time. Prefer a `<MyThing/>` template over a reflect-marker + `On<Insert<Marker>>` observer: it expands away at build, leaving no component to re-fire on scene reload.
 - Component hooks: `#[component(on_add = ...)]` accepts a call yielding a closure: use the constructors in `beet_core::bevy_utils::hook_ext`, `observe(my_observer)` for observers watching the entity, `entity_hook(|entity| ..)` for `EntityCommands` work.
 - A command aimed at an entity another task may despawn (a server's connections) must tolerate its absence: `try_insert`, `try_remove`, `try_trigger_target`. `EntityWorldMut::despawn` flushes the queue *after* removing the entity, so an observer's deferred command routinely lands on a gone target, a panic under the default error handler.
 
@@ -123,6 +125,6 @@ Full authoring rules: `crates/beet_core/src/bsx/mod.rs`. The ones every session 
 
 - **Every entity is authored under the tag of the type it most *is***, never a `<div>` with the real type in a spread: `<Route path="deploy" {ExchangeSequence}>`, not `<div {(Route{path:"deploy"}, ExchangeSequence)}>`. Between co-located types the entity's action wins (`<Repeat {RunThread}>`), absent an action the noun it names. `<Fragment>` is the plain grouping, `<Tag/>` spawns its own entity, `{Spread}` adds to the current one.
 - **Features remove components, never entities, unless the node is an effect.** A document loads whole in every binary: an unregistered uppercase tag warns, marks its entity `UnregisteredTag` and still builds its children. `bx:cfg` is the one exclusion mechanism, removing an effect's subtree from the syntax tree and leaving a `CfgExcluded` tombstone; `<RequireCfg cfg=".."/>` asserts the same condition and refuses the whole load.
-- **A registered prescan type at the entry's top level, with string attributes and no `bx:cfg`, acts before the build** (`<RepoRoot>`, `<TemplateDir>`, `<RequireCfg>`, `<Secrets>`; `app.register_prescan::<T>()` adds one, `--help` lists the set). A provider address (`AwsRegion`, `CloudflareAccount`, `CloudflareZone`) is a spread on the stack or an ancestor, resolved by ancestry from the entity that asks, never an environment variable.
+- **A registered prescan type in an entry, with string attributes and no `bx:cfg`, acts before the build**, and beside the single root element it is consumed rather than built, so a `<Sequence>` scene declares `<RequireCfg/>` as its sibling (`<RepoRoot>`, `<TemplateDir>`, `<RequireCfg>`, `<Secrets>`; `app.register_prescan::<T>()` adds one, `--help` lists the set). A provider address (`AwsRegion`, `CloudflareAccount`, `CloudflareZone`) is a spread on the stack or an ancestor, resolved by ancestry from the entity that asks, never an environment variable.
 - A `Router` is a **url space**: its subtree's routes root at it and it owns its own `RouteTree`, so a whole site mounts under a command route with urls still rooted at `/`. Resolve with `RouteTree::of`, not `entity.get::<RouteTree>()`.
 <!-- beet:sync:end -->

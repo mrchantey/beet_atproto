@@ -63,7 +63,9 @@
 //! `--skeleton-host` the generator to follow, `--appview-feed` a published feed
 //! instead, `--appview` an AppView other than the public one, `--limit` the
 //! posts per poll and `--poll` the seconds between polls. Any of the three
-//! source flags pins the source, disabling the `whats-hot` fallback.
+//! source flags pins the source, disabling the `whats-hot` fallback. Each is
+//! declared, so `--server=cli --help` lists them, and the one-shot render
+//! refuses a flag nothing declares: `--pol=2` answers `did you mean --poll?`.
 //!
 //! ## Why Two Fetches
 //!
@@ -77,7 +79,7 @@ use beet_atproto::prelude::*;
 
 /// The feed served by `examples/feed_generator.rs` with its default publisher.
 const DEFAULT_FEED: &str =
-	"at://did:example:alice/app.bsky.feed.generator/whats-alf";
+	"at://did:plc:pppppppppppppppppppppppp/app.bsky.feed.generator/whats-alf";
 /// Bluesky's own `whats-hot`, stood in for the generator when it is not up.
 /// Published, so the AppView serves it hydrated and the client needs no local
 /// service at all.
@@ -98,6 +100,7 @@ fn main() -> AppExit {
 		.init_plugin::<ThreadUiPlugin>()
 		// the pages bind their status line to this by name
 		.register_type::<FeedStatus>()
+		.register_type::<ClientLaunch>()
 		// the document layout, resolved by short type path from the `Layout`
 		// middleware below
 		.register_template::<FeedLayout>()
@@ -107,34 +110,29 @@ fn main() -> AppExit {
 
 fn setup(mut commands: Commands) -> Result {
 	let args = CliArgs::parse_env();
-	let param = |key: &str| args.params.get(key).map(|val| val.to_string());
-
-	// a published feed arrives pre-hydrated from the appview, ours needs the
-	// skeleton hydrated locally
-	let source = match param("appview-feed") {
-		Some(feed) => FeedSource::AppViewFeed { feed },
-		None => FeedSource::Skeleton {
-			host: param("skeleton-host")
-				.unwrap_or("http://localhost:8337".into()),
-			feed: param("feed").unwrap_or(DEFAULT_FEED.into()),
-		},
-	};
+	let launch = args.params.parse_reflect::<ClientParams>()?;
 	// naming a source is a request to read *that* source, so only the untouched
 	// default may quietly fall back to a published feed
-	let pinned = ["appview-feed", "skeleton-host", "feed"]
-		.iter()
-		.any(|key| param(key).is_some());
+	let pinned = launch.appview_feed.is_some()
+		|| launch.skeleton_host.is_some()
+		|| launch.feed.is_some();
+	// a published feed arrives pre-hydrated from the appview, ours needs the
+	// skeleton hydrated locally
+	let source = match launch.appview_feed {
+		Some(feed) => FeedSource::AppViewFeed { feed },
+		None => FeedSource::Skeleton {
+			host: launch
+				.skeleton_host
+				.unwrap_or("http://localhost:8337".into()),
+			feed: launch.feed.unwrap_or(DEFAULT_FEED.into()),
+		},
+	};
 	let reader = FeedReader {
 		source,
 		fallback: (!pinned).then(|| FALLBACK_FEED.to_string()),
-		appview: param("appview").map(AppView::new).unwrap_or_default(),
-		limit: param("limit")
-			.and_then(|limit| limit.parse().ok())
-			.unwrap_or(30),
-		poll: param("poll")
-			.and_then(|poll| poll.parse().ok())
-			.map(Duration::from_secs)
-			.unwrap_or(Duration::from_secs(10)),
+		appview: launch.appview.map(AppView::new).unwrap_or_default(),
+		limit: launch.limit.unwrap_or(30),
+		poll: Duration::from_secs(launch.poll.unwrap_or(10)),
 	};
 	info!("following {}", reader.source.label());
 	// the window is a projection of the feed, so it is spawned with the thread
@@ -147,8 +145,12 @@ fn setup(mut commands: Commands) -> Result {
 	));
 
 	// exactly one server: a compiled-in `TuiServer` default-boots whenever
-	// `--server` names nothing else, so the match must be exhaustive
-	let server_bundle = match param("server")
+	// `--server` names nothing else, so the match must be exhaustive. The
+	// one-shot refuses a flag nothing declares, a page tolerates whatever a
+	// link carries
+	let server_bundle = match args
+		.params
+		.get("server")
 		.map(|server| server.to_lowercase())
 		.unwrap_or("http".into())
 		.as_str()
@@ -159,16 +161,51 @@ fn setup(mut commands: Commands) -> Result {
 		}
 		.any_bundle(),
 		"tui" => TuiServer::default().any_bundle(),
-		"cli" => CliServer::default().any_bundle(),
+		"cli" => (CliServer::default(), RejectUnknownParams).any_bundle(),
 		_ => bevybail!("accepted --server values: http, tui, cli"),
 	};
 	// `CallOnReady` is the boot verb: on spawn it calls this entity's action with
 	// the process request, which starts the server facet declared above it
-	commands.spawn((server_bundle, CallOnReady::on_spawn(), children![(
-		Router::with_defaults(),
-		children![routes()]
-	)]));
+	commands.spawn((
+		server_bundle,
+		ClientLaunch,
+		CallOnReady::on_spawn(),
+		children![(Router::with_defaults(), children![routes()])],
+	));
 	Ok(())
+}
+
+/// Declares the [`ClientParams`] on the server, so the request carrying the
+/// same argv (a `--server=cli` render's) recognises them and `--help` lists
+/// them once, beneath every route.
+#[derive(Default, Component, Reflect)]
+#[reflect(Component, DeclaresParams)]
+struct ClientLaunch;
+
+impl DeclaresParams for ClientLaunch {
+	fn declared_params() -> ParamsPartial {
+		ParamsPartial::new::<ClientParams>()
+	}
+}
+
+/// The flags configuring the [`FeedReader`], read once at launch. Naming any
+/// of the three sources pins it, disabling the `whats-hot` fallback.
+#[derive(Reflect)]
+struct ClientParams {
+	/// The feed generator's at uri. Defaults to the whats-alf feed
+	/// `examples/feed_generator.rs` serves.
+	feed: Option<String>,
+	/// The generator serving `--feed`. Defaults to `http://localhost:8337`.
+	skeleton_host: Option<String>,
+	/// A published feed's at uri, read hydrated from the AppView rather than
+	/// from a generator.
+	appview_feed: Option<String>,
+	/// An AppView other than the public one.
+	appview: Option<String>,
+	/// The posts per poll. Defaults to 30.
+	limit: Option<usize>,
+	/// The seconds between polls. Defaults to 10.
+	poll: Option<u64>,
 }
 
 // ╔═══════════════════════════════════════════╗

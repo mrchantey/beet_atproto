@@ -82,7 +82,7 @@ use beet::prelude::*;
 use beet_atproto::prelude::*;
 
 const SKELETON_HOST: &str = "http://localhost:8337";
-const FEED: &str = "at://did:example:alice/app.bsky.feed.generator/whats-alf";
+const FEED: &str = "at://did:plc:pppppppppppppppppppppppp/app.bsky.feed.generator/whats-alf";
 
 #[beet::main]
 async fn main() {

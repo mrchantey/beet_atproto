@@ -46,7 +46,7 @@ fn setup(mut commands: Commands) {
 		children![(
 			feed_generator(FeedGenerator::new(
 				"example.com",
-				"did:example:alice"
+				"did:plc:pppppppppppppppppppppppp"
 			)),
 			children![(
 				FeedDef::new("whats-alf"),
@@ -69,7 +69,7 @@ That is the whole service. Read it from the inside out:
 - `feed_generator(..)` attaches the four endpoints the network expects: `getFeedSkeleton`, `describeFeedGenerator`, the DID document at `/.well-known/did.json`, and a health probe.
 - `Jetstream::default()` subscribes to a public firehose instance and routes post creates and deletes into every feed's index.
 
-The `FeedGenerator::new("example.com", "did:example:alice")` arguments are the two identities involved: the hostname serving the feed (which becomes `did:web:example.com`), and the DID of the account that will publish it. Placeholders are fine while you are local; the publishing section swaps in real ones.
+The `FeedGenerator::new("example.com", "did:plc:pppppppppppppppppppppppp")` arguments are the two identities involved: the hostname serving the feed (which becomes `did:web:example.com`), and the DID of the account that will publish it. Placeholders are fine while you are local, so long as they are well formed (`did:plc:` and 24 base32 characters, or `did:web:` and a host); the publishing section swaps in real ones.
 
 ## Run it
 
@@ -88,13 +88,13 @@ curl -s localhost:8337/xrpc/app.bsky.feed.describeFeedGenerator
 ```text
 {"version":"0.1.0"}
 {"@context":["https://www.w3.org/ns/did/v1"],"id":"did:web:example.com","service":[{"id":"#bsky_fg","serviceEndpoint":"https://example.com","type":"BskyFeedGenerator"}]}
-{"did":"did:web:example.com","feeds":[{"uri":"at://did:example:alice/app.bsky.feed.generator/whats-alf"}]}
+{"did":"did:web:example.com","feeds":[{"uri":"at://did:plc:pppppppppppppppppppppppp/app.bsky.feed.generator/whats-alf"}]}
 ```
 
 Then ask for the feed itself:
 
 ```sh
-curl -s 'localhost:8337/xrpc/app.bsky.feed.getFeedSkeleton?feed=at://did:example:alice/app.bsky.feed.generator/whats-alf&limit=3'
+curl -s 'localhost:8337/xrpc/app.bsky.feed.getFeedSkeleton?feed=at://did:plc:pppppppppppppppppppppppp/app.bsky.feed.generator/whats-alf&limit=3'
 ```
 
 ```text
